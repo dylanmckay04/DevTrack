@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { getApplication, updateApplication, updateStatus, deleteApplication, getDocuments, uploadDocument, deleteDocument } from '../services/api'
+import { getApplication, updateApplication, updateStatus, deleteApplication, getDocuments, uploadDocument, deleteDocument, getReminders, deleteReminder } from '../services/api'
+import ReminderModal from '../components/ReminderModal'
 
 const STATUSES = ['applied', 'interviewing', 'offer', 'rejected']
 const STATUS_COLORS = { applied: 'var(--blue)', interviewing: 'var(--yellow)', offer: 'var(--accent)', rejected: 'var(--red)' }
@@ -10,17 +11,20 @@ export default function ApplicationDetail() {
   const navigate = useNavigate()
   const [app, setApp] = useState(null)
   const [documents, setDocuments] = useState([])
+  const [reminders, setReminders] = useState([])
   const [editing, setEditing] = useState(false)
   const [form, setForm] = useState({})
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
+  const [showReminderModal, setShowReminderModal] = useState(false)
 
   useEffect(() => {
-    Promise.all([getApplication(id), getDocuments(id)])
-      .then(([appRes, docsRes]) => {
+    Promise.all([getApplication(id), getDocuments(id), getReminders()])
+      .then(([appRes, docsRes, remRes]) => {
         setApp(appRes.data)
         setForm({ notes: appRes.data.notes || '', job_url: appRes.data.job_url || '' })
         setDocuments(docsRes.data)
+        setReminders(remRes.data.filter((r) => r.application_id === parseInt(id)))
       })
       .finally(() => setLoading(false))
   }, [id])
@@ -57,6 +61,15 @@ export default function ApplicationDetail() {
   const handleDeleteDoc = async (docId) => {
     await deleteDocument(id, docId)
     setDocuments((prev) => prev.filter((d) => d.id !== docId))
+  }
+
+  const handleReminderCreated = (reminder) => {
+    setReminders((prev) => [...prev, reminder])
+  }
+
+  const handleDeleteReminder = async (remId) => {
+    await deleteReminder(remId)
+    setReminders((prev) => prev.filter((r) => r.id !== remId))
   }
 
   if (loading) return <p style={{ padding: '24px', color: 'var(--text-muted)' }}>loading...</p>
@@ -161,7 +174,27 @@ export default function ApplicationDetail() {
               ))
           }
         </section>
+
+        {/* Reminders */}
+        <section style={styles.section}>
+          <div style={styles.sectionHeader}>
+            <h2 style={styles.sectionTitle}>// reminders</h2>
+            <button onClick={() => setShowReminderModal(true)}>+ add</button>
+          </div>
+          {reminders.length === 0
+            ? <p style={styles.empty}>no reminders added</p>
+            : reminders.map((rem) => (
+                <div key={rem.id} style={styles.remRow}>
+                  <span style={styles.remName}>{rem.message}</span>
+                  <button className="danger" onClick={() => handleDeleteReminder(rem.id)} style={{ fontSize: '10px', padding: '2px 8px' }}>remove</button>
+                </div>
+              ))
+          }
+        </section>
       </div>
+      {showReminderModal && (
+        <ReminderModal onClose={() => setShowReminderModal(false)} onCreated={handleReminderCreated} appId={id}/>
+      )}
     </div>
   )
 }
@@ -186,7 +219,10 @@ const styles = {
   val: { color: 'var(--text-primary)' },
   notes: { color: 'var(--text-secondary)', fontSize: '12px', lineHeight: 1.7, whiteSpace: 'pre-wrap' },
   docRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--border-muted)' },
+  remRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--border-muted)' },
   docName: { fontSize: '11px', color: 'var(--text-secondary)' },
+  remName: { fontSize: '11px', color: 'var(--text-secondary)' },
   uploadBtn: { fontSize: '11px', color: 'var(--accent)', cursor: 'pointer', border: '1px solid var(--accent)', padding: '4px 10px', borderRadius: 'var(--radius)', background: 'var(--accent-dim)' },
+  remindBtn: { fontSize: '11px', color: 'var(--accent)', cursor: 'pointer', border: '1px solid var(--accent)', padding: '4px 10px', borderRadius: 'var(--radius)', background: 'var(--accent-dim)' },
   empty: { color: 'var(--text-muted)', fontSize: '11px' },
 }
