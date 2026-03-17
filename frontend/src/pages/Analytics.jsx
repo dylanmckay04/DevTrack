@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { getApplications } from '../services/api'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, CartesianGrid } from 'recharts'
+import { BarChart, Bar, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, CartesianGrid } from 'recharts'
 
 const STATUS_COLORS = { applied: '#58a6ff', interviewing: '#d29922', offer: '#39d353', rejected: '#f85149' }
 
@@ -90,11 +90,10 @@ export default function Analytics() {
               <YAxis tick={{ fill: 'var(--text-muted)', fontSize: 11, fontFamily: 'var(--font)' }} axisLine={false} tickLine={false} allowDecimals={false} />
               <Tooltip content={<CustomTooltip />} cursor={{ fill: 'var(--bg-overlay)' }} />
               <Bar dataKey="count" radius={[2, 2, 0, 0]}
-                fill="#39d353"
                 label={false}
               >
                 {statusCounts.map((entry) => (
-                  <rect key={entry.status} fill={STATUS_COLORS[entry.status]} />
+                  <Cell key={entry.status} fill={STATUS_COLORS[entry.status]} />
                 ))}
               </Bar>
             </BarChart>
