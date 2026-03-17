@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from app.database import Base, engine
+from app.database import engine
 from app.routers import auth, applications, documents, reminders, websocket
 import time
 import sqlalchemy
@@ -18,7 +18,6 @@ def wait_for_db(retries=10, delay=3):
     raise Exception("Could not connect to database after multiple retries")
 
 wait_for_db()
-Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="DevTrack")
 
