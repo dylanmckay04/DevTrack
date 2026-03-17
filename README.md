@@ -17,20 +17,20 @@
 <h2>Architecture</h2>
 <pre>
 ┌─────────────┐     HTTP/WS      ┌─────────────────┐
-│  React      │ ◄──────────────► │  FastAPI        │
-│  Frontend   │                  │  (uvicorn)      │
+│   React     │ ◄──────────────► │     FastAPI     │
+│  Frontend   │                  │    (uvicorn)    │
 └─────────────┘                  └────────┬────────┘
                                           │
                     ┌─────────────────────┼─────────────────────┐
                     │                     │                     │
              ┌──────▼──────┐    ┌─────────▼─────┐    ┌────────▼───────┐
-             │  PostgreSQL │    │  Redis        │    │  Cloudflare R2 │
-             │  (database) │    │  (task broker)│    │  (file storage)│
+             │  PostgreSQL │    │     Redis     │    │  Cloudflare R2 │
+             │  (database) │    │ (task broker) │    │ (file storage) │
              └─────────────┘    └───────┬───────┘    └────────────────┘
                                         │
                                 ┌───────▼───────┐
-                                │  Celery       │
-                                │  Worker       │
+                                │    Celery     │
+                                │    Worker     │
                                 └───────────────┘
 </pre>
 
