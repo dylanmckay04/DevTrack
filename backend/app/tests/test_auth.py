@@ -1,9 +1,4 @@
-from fastapi.testclient import TestClient
-from app.main import app
-
-client = TestClient(app)
-
-def test_health_check():
+def test_health_check(client):
     response = client.get("/health")
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
@@ -23,8 +18,8 @@ def test_login(client):
         "email": "dylan@example.com",
         "password": "strongPass123"
     })
-    response = client.post("/auth/login", json={
-        "email": "dylan@example.com",
+    response = client.post("/auth/login", data={
+        "username": "dylan@example.com",
         "password": "strongPass123"
     })
     assert response.status_code == 200
@@ -35,8 +30,8 @@ def test_login_wrong_password(client):
         "email": "dylan@example.com",
         "password": "strongPass123"
     })
-    response = client.post("/auth/login", json={
-        "email": "dylan@example.com",
+    response = client.post("/auth/login", data={
+        "username": "dylan@example.com",
         "password": "wrongPass321"
     })
     assert response.status_code == 401

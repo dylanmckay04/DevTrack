@@ -1,3 +1,7 @@
+import os
+os.environ["TESTING"] = "1"
+os.environ["DATABASE_URL"] = "postgresql://postgres:postgres@localhost:5433/devtrack_test"
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -6,9 +10,7 @@ from app.main import app
 from app.database import Base
 from app.core.dependencies import get_db
 
-TEST_DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/devtrack_test"
-
-engine = create_engine(TEST_DATABASE_URL)
+engine = create_engine("postgresql://postgres:postgres@localhost:5433/devtrack_test")
 TestingSessionLocal = sessionmaker(bind=engine)
 
 @pytest.fixture(scope="session", autouse=True)
@@ -42,8 +44,8 @@ def auth_client(client):
         "email": "test@example.com",
         "password": "testPass123"
     })
-    response = client.post("/auth/login", json={
-        "email": "test@example.com",
+    response = client.post("/auth/login", data={
+        "username": "test@example.com",
         "password": "testPass123"
     })
     token = response.json()["access_token"]

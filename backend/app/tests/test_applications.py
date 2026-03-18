@@ -37,16 +37,17 @@ def test_cannot_access_other_users_application(auth_client, client):
     })
     app_id = create.json()["id"]
     
-    client.post("/register", json={
+    client.post("/auth/register", json={
         "email": "test2@example.com",
         "password": "testPass123"
     })
-    login = client.post("/login", json={
-        "email": "test2@example.com",
+    login = client.post("/auth/login", data={
+        "username": "test2@example.com",
         "password": "testPass123"
     })
     token = login.json()["access_token"]
     client.headers.update({"Authorization": f"Bearer {token}"})
     
     response = client.get(f"/applications/{app_id}")
-    return response.status_code == 403
+    assert response.status_code == 404 # hide resource from other users
+    
