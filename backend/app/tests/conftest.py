@@ -15,7 +15,7 @@ TestingSessionLocal = sessionmaker(bind=engine)
 def setup_database():
     Base.metadata.create_all(bind=engine)
     yield
-    Base.metadata_drop_all(bind=engine)
+    Base.metadata.drop_all(bind=engine)
 
 @pytest.fixture
 def db():
