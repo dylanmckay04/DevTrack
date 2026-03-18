@@ -80,7 +80,7 @@
 
 <h2>How to run <em>DevTrack</em> locally</h2>
 <ol>
-    <li>Clone the Git repository by running <code>git clone https://github.com/dylanmckay04/devTrack.git</code></li>
+    <li>Clone the Git repository by running <code>git clone https://github.com/dylanmckay04/DevTrack.git</code></li>
     <li>Create a <code>.env</code> file and add the necessary environment variables (<a href="#env">see section below</a>)</li>
     <li>Ensure <a href="https://www.docker.com/" target="_blank">Docker</a> is running and run <code>docker compose up --build</code> from the project root</li>
     <li>In a separate terminal, run the initial database migration: <code>cd backend && alembic upgrade head</code></li>
