@@ -51,3 +51,26 @@ def test_cannot_access_other_users_application(auth_client, client):
     response = client.get(f"/applications/{app_id}")
     assert response.status_code == 404 # hide resource from other users
     
+def test_get_single_application(auth_client):
+    create = auth_client.post("/applications", json={
+        "company": "Test Inc.",
+        "role": "Backend Engineer"
+    })
+    app_id = create.json()["id"]
+    response = auth_client.get(f"/applications/{app_id}")
+    assert response.status_code == 200
+    assert response.json()["id"] == app_id
+    assert response.json()["company"] == "Test Inc."
+
+def test_delete_application(auth_client):
+    create = auth_client.post("/applications", json={
+        "company": "Test Inc.",
+        "role": "Backend Engineer"
+    })
+    app_id = create.json()["id"]
+    
+    response = auth_client.delete(f"/applications/{app_id}")
+    assert response.status_code == 204
+    
+    follow_up = auth_client.get(f"/applications/{app_id}")
+    assert follow_up.status_code == 404
