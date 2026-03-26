@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List
 from app.core.dependencies import get_db, get_current_user
 from app.models.user import User
+from app.models.application import Application
 from app.models.document import Document
 from app.schemas.document import DocumentOut
 from app.services.r2 import upload_file, delete_file
@@ -10,7 +11,7 @@ from app.services.r2 import upload_file, delete_file
 router = APIRouter()
 
 
-@router.post("/{app_id}/documents", response_model=DocumentOut)
+@router.post("/{app_id}/documents", response_model=DocumentOut, status_code=201)
 async def upload_document(
     app_id: int,
     file: UploadFile = File(...),
