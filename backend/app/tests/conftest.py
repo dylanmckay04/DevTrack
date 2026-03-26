@@ -40,7 +40,7 @@ def client(db):
     
 @pytest.fixture
 def auth_client(client):
-    client.post("/auth/register", json={
+    register_response = client.post("/auth/register", json={
         "email": "test@example.com",
         "password": "testPass123"
     })
@@ -50,5 +50,7 @@ def auth_client(client):
     })
     token = response.json()["access_token"]
     client.headers.update({"Authorization": f"Bearer {token}"})
+    import types
+    client.user = types.SimpleNamespace(id=register_response.json()["id"])
     return client
 
