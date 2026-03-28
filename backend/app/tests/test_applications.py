@@ -74,3 +74,36 @@ def test_delete_application(auth_client):
     
     follow_up = auth_client.get(f"/applications/{app_id}")
     assert follow_up.status_code == 404
+
+def test_create_application_broadcasts_websocket_event(auth_client):
+    with auth_client.websocket_connect("/ws/board") as websocket:
+        response = auth_client.post("/applications", json={
+            "company": "Realtime Inc.",
+            "role": "Platform Engineer"
+        })
+
+        assert response.status_code == 201
+        message = websocket.receive_json()
+
+    assert message["type"] == "application.created"
+    assert message["application"]["id"] == response.json()["id"]
+    assert message["application"]["status"] == "applied"
+
+def test_update_status_broadcasts_websocket_event(auth_client):
+    create = auth_client.post("/applications", json={
+        "company": "Realtime Inc.",
+        "role": "Platform Engineer"
+    })
+    app_id = create.json()["id"]
+
+    with auth_client.websocket_connect("/ws/board") as websocket:
+        response = auth_client.patch(f"/applications/{app_id}/status", json={
+            "status": "offer"
+        })
+
+        assert response.status_code == 200
+        message = websocket.receive_json()
+
+    assert message["type"] == "application.status_changed"
+    assert message["application"]["id"] == app_id
+    assert message["application"]["status"] == "offer"

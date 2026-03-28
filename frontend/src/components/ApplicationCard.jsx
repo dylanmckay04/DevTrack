@@ -1,3 +1,5 @@
+import { useDraggable } from '@dnd-kit/core'
+import { CSS } from '@dnd-kit/utilities'
 import { useNavigate } from 'react-router-dom'
 
 const STATUS_COLORS = {
@@ -9,12 +11,31 @@ const STATUS_COLORS = {
 
 export default function ApplicationCard({ app }) {
   const navigate = useNavigate()
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: `application-${app.id}`,
+    data: {
+      applicationId: app.id,
+      status: app.status,
+    },
+  })
   const date = app.applied_at
     ? new Date(app.applied_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
     : new Date(app.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 
+  const dragStyle = {
+    transform: CSS.Translate.toString(transform),
+    opacity: isDragging ? 0.45 : 1,
+    cursor: isDragging ? 'grabbing' : 'grab',
+  }
+
   return (
-    <div style={styles.card} onClick={() => navigate(`/applications/${app.id}`)}>
+    <div
+      ref={setNodeRef}
+      style={{ ...styles.card, ...dragStyle }}
+      onClick={() => !isDragging && navigate(`/applications/${app.id}`)}
+      {...listeners}
+      {...attributes}
+    >
       <div style={styles.top}>
         <span style={styles.company}>{app.company}</span>
         <span style={{ ...styles.dot, background: STATUS_COLORS[app.status] }} title={app.status} />
@@ -34,9 +55,10 @@ const styles = {
     border: '1px solid var(--border)',
     borderRadius: 'var(--radius)',
     padding: '12px',
-    cursor: 'pointer',
+    cursor: 'grab',
     transition: 'border-color var(--transition), background var(--transition)',
     marginBottom: '8px',
+    touchAction: 'none',
   },
   top: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' },
   company: { fontWeight: 700, fontSize: '12px', color: 'var(--text-primary)' },

@@ -1,3 +1,4 @@
+import { useDroppable } from '@dnd-kit/core'
 import ApplicationCard from './ApplicationCard'
 
 const COLUMN_META = {
@@ -9,8 +10,13 @@ const COLUMN_META = {
 
 export default function KanbanColumn({ status, applications }) {
   const meta = COLUMN_META[status]
+  const { isOver, setNodeRef } = useDroppable({
+    id: `column-${status}`,
+    data: { status },
+  })
+
   return (
-    <div style={styles.column}>
+    <div ref={setNodeRef} style={{ ...styles.column, ...(isOver ? styles.columnOver : null) }}>
       <div style={styles.header}>
         <span style={{ ...styles.indicator, background: meta.color }} />
         <span style={styles.label}>{meta.label}</span>
@@ -36,6 +42,11 @@ const styles = {
     borderRadius: 'var(--radius)',
     display: 'flex',
     flexDirection: 'column',
+    transition: 'border-color var(--transition), background var(--transition)',
+  },
+  columnOver: {
+    borderColor: 'var(--accent)',
+    background: 'var(--bg-raised)',
   },
   header: {
     display: 'flex',
