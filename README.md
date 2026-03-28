@@ -55,7 +55,7 @@
     <li><a href="https://developers.cloudflare.com/r2/" target="_blank">Cloudflare R2</a> for document storage</li>
     <li>Data validation with <a href="https://docs.pydantic.dev/latest/" target="_blank">Pydantic</a></li>
     <li><a href="https://www.postgresql.org/" target="_blank">PostgreSQL</a> database</li>
-    <li>pytest test suite covering authentication and application CRUD (11 tests)</li>
+    <li>pytest test suite covering authentication, application CRUD, and WebSockets (16 tests)</li>
     <li><a href="https://www.sqlalchemy.org/" target="_blank">SQLAlchemy</a> for ORM interaction</li>
     <li>WebSocket support for real-time board sync</li>
 </ul>
