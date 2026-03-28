@@ -5,6 +5,7 @@ from app.core.dependencies import get_db, get_current_user
 from app.models.user import User
 from app.models.application import Application
 from app.schemas.application import ApplicationCreate, ApplicationUpdate, ApplicationStatusUpdate, ApplicationOut
+from app.services.board_events import broadcast_application_event
 
 router = APIRouter()
 
@@ -15,11 +16,12 @@ def get_applications(db: Session = Depends(get_db), current_user: User = Depends
 
 
 @router.post("", response_model=ApplicationOut, status_code=status.HTTP_201_CREATED)
-def create_application(app_in: ApplicationCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+async def create_application(app_in: ApplicationCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     application = Application(**app_in.model_dump(), owner_id=current_user.id)
     db.add(application)
     db.commit()
     db.refresh(application)
+    await broadcast_application_event("application.created", application)
     return application
 
 
@@ -32,7 +34,7 @@ def get_application(app_id: int, db: Session = Depends(get_db), current_user: Us
 
 
 @router.patch("/{app_id}", response_model=ApplicationOut)
-def update_application(app_id: int, app_in: ApplicationUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+async def update_application(app_id: int, app_in: ApplicationUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     app = db.query(Application).filter(Application.id == app_id, Application.owner_id == current_user.id).first()
     if not app:
         raise HTTPException(status_code=404, detail="Application not found")
@@ -40,24 +42,39 @@ def update_application(app_id: int, app_in: ApplicationUpdate, db: Session = Dep
         setattr(app, key, value)
     db.commit()
     db.refresh(app)
+    await broadcast_application_event("application.updated", app)
     return app
 
 
 @router.patch("/{app_id}/status", response_model=ApplicationOut)
-def update_status(app_id: int, status_in: ApplicationStatusUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+async def update_status(app_id: int, status_in: ApplicationStatusUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     app = db.query(Application).filter(Application.id == app_id, Application.owner_id == current_user.id).first()
     if not app:
         raise HTTPException(status_code=404, detail="Application not found")
     app.status = status_in.status
     db.commit()
     db.refresh(app)
+    await broadcast_application_event("application.status_changed", app)
     return app
 
 
 @router.delete("/{app_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_application(app_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+async def delete_application(app_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     app = db.query(Application).filter(Application.id == app_id, Application.owner_id == current_user.id).first()
     if not app:
         raise HTTPException(status_code=404, detail="Application not found")
+    deleted_snapshot = {
+        "id": app.id,
+        "owner_id": app.owner_id,
+        "company": app.company,
+        "role": app.role,
+        "status": app.status.value if hasattr(app.status, "value") else app.status,
+        "job_url": app.job_url,
+        "notes": app.notes,
+        "applied_at": app.applied_at,
+        "created_at": app.created_at,
+        "updated_at": app.updated_at,
+    }
     db.delete(app)
     db.commit()
+    await broadcast_application_event("application.deleted", type("DeletedApplication", (), deleted_snapshot)())
