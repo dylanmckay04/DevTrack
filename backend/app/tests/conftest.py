@@ -49,6 +49,7 @@ def auth_client(client):
         "password": "testPass123"
     })
     token = response.json()["access_token"]
+    client.token = token
     client.headers.update({"Authorization": f"Bearer {token}"})
     import types
     client.user = types.SimpleNamespace(id=register_response.json()["id"])
