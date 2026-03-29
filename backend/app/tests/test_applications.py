@@ -1,3 +1,6 @@
+from fastapi.testclient import TestClient
+
+
 def test_create_application(auth_client):
     response = auth_client.post("/applications", json={
         "company": "Test Inc.",
@@ -110,3 +113,41 @@ def test_update_status_broadcasts_websocket_event(auth_client):
     assert message["type"] == "application.status_changed"
     assert message["application"]["id"] == app_id
     assert message["application"]["status"] == "offer"
+
+
+def test_websocket_events_are_isolated_by_user(auth_client):
+    socket_token_user1 = auth_client.post("/auth/socket-token").json()["socket_token"]
+
+    with TestClient(auth_client.app) as second_client:
+        second_client.post("/auth/register", json={
+            "email": "isolation@example.com",
+            "password": "testPass123",
+        })
+        second_login = second_client.post("/auth/login", data={
+            "username": "isolation@example.com",
+            "password": "testPass123",
+        })
+        second_client.headers.update({"Authorization": f"Bearer {second_login.json()['access_token']}"})
+        socket_token_user2 = second_client.post("/auth/socket-token").json()["socket_token"]
+
+        with auth_client.websocket_connect(f"/ws/board?token={socket_token_user1}") as ws_user1:
+            with second_client.websocket_connect(f"/ws/board?token={socket_token_user2}") as ws_user2:
+                user1_create = auth_client.post("/applications", json={
+                    "company": "Owner One Inc.",
+                    "role": "Backend Engineer",
+                })
+                assert user1_create.status_code == 201
+
+                user2_create = second_client.post("/applications", json={
+                    "company": "Owner Two Inc.",
+                    "role": "Frontend Engineer",
+                })
+                assert user2_create.status_code == 201
+
+                user1_event = ws_user1.receive_json()
+                user2_event = ws_user2.receive_json()
+
+    assert user1_event["application"]["owner_id"] == auth_client.user.id
+    assert user1_event["application"]["id"] == user1_create.json()["id"]
+    assert user2_event["application"]["owner_id"] != auth_client.user.id
+    assert user2_event["application"]["id"] == user2_create.json()["id"]
