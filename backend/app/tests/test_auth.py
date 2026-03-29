@@ -1,3 +1,7 @@
+import pytest
+from starlette.websockets import WebSocketDisconnect
+
+
 def test_health_check(client):
     response = client.get("/health")
     assert response.status_code == 200
@@ -47,4 +51,17 @@ def test_get_socket_token(auth_client):
     assert "socket_token" in data
     assert data["token_type"] == "socket"
     assert data["expires_in"] == 60
+
+def test_socket_token_is_single_use(auth_client):
+    socket_token = auth_client.post("/auth/socket-token").json()["socket_token"]
+
+    with auth_client.websocket_connect(f"/ws/board?token={socket_token}") as websocket:
+        websocket.send_text("ping")
+
+    with pytest.raises(WebSocketDisconnect) as exc_info:
+        with auth_client.websocket_connect(f"/ws/board?token={socket_token}") as websocket:
+            websocket.send_text("ping")
+            websocket.receive_text()
+
+    assert exc_info.value.code == 1008
 

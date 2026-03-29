@@ -5,6 +5,7 @@ from app.core.dependencies import get_db, get_current_user
 from app.core.security import hash_password, verify_password, create_access_token, create_socket_token, SOCKET_TOKEN_EXPIRE_SECONDS
 from app.models.user import User
 from app.schemas.user import UserCreate, UserOut, Token, SocketToken
+from app.services.socket_tokens import socket_token_store
 
 router = APIRouter()
 
@@ -36,7 +37,8 @@ def get_me(current_user: User = Depends(get_current_user)):
 
 @router.post("/socket-token", response_model=SocketToken)
 def get_socket_token(current_user: User = Depends(get_current_user)):
-    token = create_socket_token({"sub": str(current_user.id)})
+    token, jti = create_socket_token({"sub": str(current_user.id)})
+    socket_token_store.remember(jti, current_user.id, SOCKET_TOKEN_EXPIRE_SECONDS)
     return {
         "socket_token": token,
         "token_type": "socket",
