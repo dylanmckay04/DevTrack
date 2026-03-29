@@ -76,7 +76,9 @@ def test_delete_application(auth_client):
     assert follow_up.status_code == 404
 
 def test_create_application_broadcasts_websocket_event(auth_client):
-    with auth_client.websocket_connect(f"/ws/board?token={auth_client.token}") as websocket:
+    socket_token = auth_client.post("/auth/socket-token").json()["socket_token"]
+
+    with auth_client.websocket_connect(f"/ws/board?token={socket_token}") as websocket:
         response = auth_client.post("/applications", json={
             "company": "Realtime Inc.",
             "role": "Platform Engineer"
@@ -95,8 +97,9 @@ def test_update_status_broadcasts_websocket_event(auth_client):
         "role": "Platform Engineer"
     })
     app_id = create.json()["id"]
+    socket_token = auth_client.post("/auth/socket-token").json()["socket_token"]
 
-    with auth_client.websocket_connect(f"/ws/board?token={auth_client.token}") as websocket:
+    with auth_client.websocket_connect(f"/ws/board?token={socket_token}") as websocket:
         response = auth_client.patch(f"/applications/{app_id}/status", json={
             "status": "offer"
         })

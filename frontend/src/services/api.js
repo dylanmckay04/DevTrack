@@ -30,6 +30,7 @@ export const login = (email, password) => {
   return api.post('/auth/login', form)
 }
 export const getMe = () => api.get('/auth/me')
+export const getSocketToken = () => api.post('/auth/socket-token')
 
 // Applications
 export const getApplications = () => api.get('/applications')

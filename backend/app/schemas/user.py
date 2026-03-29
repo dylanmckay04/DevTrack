@@ -29,3 +29,9 @@ class UserOut(BaseModel):
 class Token(BaseModel):
     access_token: str
     token_type: str
+
+
+class SocketToken(BaseModel):
+    socket_token: str
+    token_type: str
+    expires_in: int

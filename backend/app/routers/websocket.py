@@ -1,5 +1,5 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-from app.core.security import decode_access_token
+from app.core.security import decode_socket_token
 from app.services.board_events import manager
 
 router = APIRouter()
@@ -8,7 +8,7 @@ router = APIRouter()
 @router.websocket("/ws/board")
 async def board_websocket(websocket: WebSocket):
     token = websocket.query_params.get("token")
-    payload = decode_access_token(token) if token else None
+    payload = decode_socket_token(token) if token else None
     user_id = payload.get("sub") if payload else None
 
     if user_id is None:
