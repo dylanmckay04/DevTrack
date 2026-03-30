@@ -1,20 +1,23 @@
+import logging
+import os
+import time
+import sqlalchemy
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from app.database import engine
 from app.routers import auth, applications, documents, reminders, websocket
-import time
-import sqlalchemy
-import os
+
+logger = logging.getLogger(__name__)
 
 def wait_for_db(retries=10, delay=3):
     for attempt in range(retries):
         try:
             with engine.connect():
-                print("Database is ready")
+                logger.info("Database is ready")
                 return
         except sqlalchemy.exc.OperationalError:
-            print(f"Database not ready, retrying in {delay}s... (attempt {attempt + 1}/{retries})")
+            logger.warning("Database not ready, retrying in %ds... (attempt %d/%d)", delay, attempt + 1, retries)
             time.sleep(delay)
     raise Exception("Could not connect to database after multiple retries")
 if not os.getenv("TESTING"):
@@ -32,6 +35,7 @@ app.add_middleware(
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
+    logger.exception("Unhandled exception: %s %s", request.method, request.url)
     return JSONResponse(
         status_code=500,
         content={"detail": "An unexpected error occurred"}
