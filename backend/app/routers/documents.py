@@ -8,6 +8,13 @@ from app.models.document import Document
 from app.schemas.document import DocumentOut
 from app.services.r2 import upload_file, delete_file
 
+ALLOWED_CONTENT_TYPES = {
+    "application/pdf",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+}
+MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # 10 MB
+
 router = APIRouter()
 
 
@@ -18,6 +25,14 @@ async def upload_document(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    if file.content_type not in ALLOWED_CONTENT_TYPES:
+        raise HTTPException(status_code=400, detail="Only PDF and Word documents are allowed")
+
+    contents = await file.read()
+    if len(contents) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=400, detail="File too large (max 10 MB)")
+    await file.seek(0)
+
     application = db.query(Application).filter(Application.id == app_id, Application.owner_id == current_user.id).first()
     if not application:
         raise HTTPException(status_code=404, detail="Application not found")
