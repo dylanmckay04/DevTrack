@@ -1,6 +1,8 @@
 import os
+
 os.environ["TESTING"] = "1"
-os.environ["DATABASE_URL"] = "postgresql://postgres:postgres@localhost:5433/devtrack_test"
+_TEST_DB_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5433/devtrack_test")
+os.environ["DATABASE_URL"] = _TEST_DB_URL
 
 import pytest
 from fastapi.testclient import TestClient
@@ -10,7 +12,7 @@ from app.main import app
 from app.database import Base
 from app.core.dependencies import get_db
 
-engine = create_engine("postgresql://postgres:postgres@localhost:5433/devtrack_test")
+engine = create_engine(_TEST_DB_URL)
 TestingSessionLocal = sessionmaker(bind=engine)
 
 @pytest.fixture(scope="session", autouse=True)
