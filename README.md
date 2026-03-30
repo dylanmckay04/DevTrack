@@ -11,8 +11,9 @@ This project is the centerpiece of my portfolio and reflects how I approach soft
 
 - Full-stack ownership across React, FastAPI, PostgreSQL, Redis, and cloud storage
 - Realtime architecture with server-authoritative events and user-scoped WebSocket delivery
-- Security-focused implementation details, including short-lived single-use socket tokens with replay protection
-- Testing discipline with integration tests for authentication, authorization, CRUD, and realtime edge cases
+- Security-focused implementation: rate limiting, upload validation, single-use socket tokens with replay protection
+- Testing discipline with integration tests for authentication, authorization, CRUD, upload validation, and realtime edge cases
+- CI pipeline with GitHub Actions running the full suite against real PostgreSQL and Redis service containers
 - Practical product design for a real user workflow rather than isolated feature demos
 
 ## Features
@@ -20,11 +21,12 @@ This project is the centerpiece of my portfolio and reflects how I approach soft
 - Kanban board with four status columns: Applied -> Interviewing -> Offer -> Rejected
 - Drag-and-drop Kanban cards with optimistic UI updates and automatic rollback on failed writes
 - Full application CRUD with notes, job URL, and date tracking
-- Document uploads (resume, cover letter) stored in Cloudflare R2
-- Scheduled email reminders powered by Celery + Redis
+- Document uploads (resume, cover letter) stored in Cloudflare R2, with content-type allowlisting and a 10 MB size cap
+- Scheduled email reminders powered by Celery + Redis, with task IDs persisted so reminders can be cancelled before they fire
 - Real-time board updates via WebSockets with automatic reconnect and token refresh
 - Analytics dashboard with application stats and weekly activity charts
 - JWT authentication with bcrypt-sha256 password hashing and short-lived signed WebSocket tokens
+- Rate limiting on authentication endpoints (5 registrations/min, 10 logins/min) to prevent brute-force and enumeration attacks
 
 ## Key Engineering Highlights
 
@@ -33,6 +35,8 @@ This project is the centerpiece of my portfolio and reflects how I approach soft
 - Short-lived socket tokens minted from an authenticated HTTP endpoint
 - Single-use jti replay protection backed by Redis, with a process-local fallback for temporary Redis outages
 - Exponential-backoff websocket reconnect with token re-auth on reconnect
+- Rate limiting on auth endpoints via slowapi (5/min register, 10/min login), disabled automatically in test runs
+- Upload validation rejects non-PDF/Word content types and files over 10 MB before any cloud storage call
 
 ## Architecture
 
@@ -76,8 +80,10 @@ This project is the centerpiece of my portfolio and reflects how I approach soft
 - Uvicorn app server
 - Cloudflare R2 for document storage
 - Celery + Redis for scheduled reminders
+- slowapi for request rate limiting
 - User-scoped, server-originated WebSocket board events
-- Pytest suite covering auth, CRUD, and WebSocket security/replay hardening
+- Pytest suite covering auth, CRUD, upload validation, and WebSocket security/replay hardening
+- GitHub Actions CI (PostgreSQL 16 + Redis 7 service containers)
 
 ## Testing
 
@@ -133,12 +139,15 @@ PostgreSQL is a production-grade relational database with strong concurrency and
 
 ## Security and Realtime Hardening
 
+- Rate limiting on `/auth/register` (5/min) and `/auth/login` (10/min) to mitigate brute-force and credential-stuffing attacks
+- Document upload validation: content-type allowlist (PDF, Word) and 10 MB size cap enforced before any R2 call
 - Server-authoritative board events: application create/update/delete/status changes emit from backend after commit
-- User-scoped delivery: each socket is bound to an authenticated user and receives only that user’s events
+- User-scoped delivery: each socket is bound to an authenticated user and receives only that user's events
 - Short-lived socket tokens: frontend requests a dedicated token from `POST /auth/socket-token`
 - Replay protection with `jti`: each socket token has a unique token ID that is consumed once at connect
 - Redis-backed token tracking with fallback: Redis is primary, with process-local in-memory fallback for temporary Redis outages
 - Client reconnect + re-auth: frontend reconnects with exponential backoff and mints a fresh socket token each attempt
+- Global exception handler logs all unhandled errors with full context before returning a generic 500 response
 
 Tradeoff note: in-memory connection management and fallback token tracking keep local development simple, but horizontal scale requires Redis pub/sub and shared token-state guarantees across instances.
 
@@ -244,4 +253,4 @@ Interactive documentation: https://devtrack-production-5644.up.railway.app/docs
 - Presigned URL document preview in the browser
 - Redis pub/sub for multi-instance WebSocket fanout
 - OAuth login (GitHub, Google)
-- Email notifications on application status changes
+- Board pagination for large datasets
