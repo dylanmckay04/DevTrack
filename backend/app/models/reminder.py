@@ -13,6 +13,7 @@ class Reminder(Base):
     message = Column(String, nullable=False)
     remind_at = Column(DateTime(timezone=True), nullable=False)
     sent = Column(Boolean, default=False)
+    celery_task_id = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     owner = relationship("User", back_populates="reminders")

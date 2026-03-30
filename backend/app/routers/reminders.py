@@ -16,11 +16,12 @@ def create_reminder(reminder_in: ReminderCreate, db: Session = Depends(get_db), 
     db.add(reminder)
     db.commit()
     db.refresh(reminder)
-    # Schedule Celery task
-    send_reminder_email.apply_async(
+    result = send_reminder_email.apply_async(
         args=[reminder.id, current_user.email, reminder.message],
         eta=reminder.remind_at,
     )
+    reminder.celery_task_id = result.id
+    db.commit()
     return reminder
 
 
@@ -34,5 +35,7 @@ def delete_reminder(reminder_id: int, db: Session = Depends(get_db), current_use
     reminder = db.query(Reminder).filter(Reminder.id == reminder_id, Reminder.owner_id == current_user.id).first()
     if not reminder:
         raise HTTPException(status_code=404, detail="Reminder not found")
+    if reminder.celery_task_id:
+        send_reminder_email.AsyncResult(reminder.celery_task_id).revoke()
     db.delete(reminder)
     db.commit()
