@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from app.core.dependencies import get_db, get_current_user
 from app.core.security import hash_password, verify_password, create_access_token, create_socket_token, SOCKET_TOKEN_EXPIRE_SECONDS
+from app.core.limiter import limiter
 from app.models.user import User
 from app.schemas.user import UserCreate, UserOut, Token, SocketToken
 from app.services.socket_tokens import socket_token_store
@@ -11,7 +12,8 @@ router = APIRouter()
 
 
 @router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
-def register(user_in: UserCreate, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+def register(request: Request, user_in: UserCreate, db: Session = Depends(get_db)):
     if db.query(User).filter(User.email == user_in.email).first():
         raise HTTPException(status_code=400, detail="Email already registered")
     user = User(email=user_in.email, hashed_password=hash_password(user_in.password))
@@ -22,7 +24,8 @@ def register(user_in: UserCreate, db: Session = Depends(get_db)):
 
 
 @router.post("/login", response_model=Token)
-def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == form_data.username).first()
     if not user or not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid credentials")
