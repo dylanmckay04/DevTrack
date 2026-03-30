@@ -5,7 +5,7 @@ from app.core.dependencies import get_db, get_current_user
 from app.models.user import User
 from app.models.application import Application
 from app.schemas.application import ApplicationCreate, ApplicationUpdate, ApplicationStatusUpdate, ApplicationOut
-from app.services.board_events import broadcast_application_event
+from app.services.board_events import broadcast_application_event, broadcast_delete_event
 
 router = APIRouter()
 
@@ -63,18 +63,8 @@ async def delete_application(app_id: int, db: Session = Depends(get_db), current
     app = db.query(Application).filter(Application.id == app_id, Application.owner_id == current_user.id).first()
     if not app:
         raise HTTPException(status_code=404, detail="Application not found")
-    deleted_snapshot = {
-        "id": app.id,
-        "owner_id": app.owner_id,
-        "company": app.company,
-        "role": app.role,
-        "status": app.status.value if hasattr(app.status, "value") else app.status,
-        "job_url": app.job_url,
-        "notes": app.notes,
-        "applied_at": app.applied_at,
-        "created_at": app.created_at,
-        "updated_at": app.updated_at,
-    }
+    owner_id = app.owner_id
+    application_id = app.id
     db.delete(app)
     db.commit()
-    await broadcast_application_event("application.deleted", type("DeletedApplication", (), deleted_snapshot)())
+    await broadcast_delete_event(owner_id, application_id)

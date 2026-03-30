@@ -53,3 +53,13 @@ async def broadcast_application_event(event_type: str, application: Any):
             },
         }
     )
+
+
+async def broadcast_delete_event(owner_id: int, application_id: int):
+    await manager.broadcast_to_user(
+        owner_id,
+        {
+            "type": "application.deleted",
+            "application": {"id": application_id, "owner_id": owner_id},
+        },
+    )
