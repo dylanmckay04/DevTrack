@@ -11,7 +11,12 @@ class SocketTokenStore:
     def __init__(self):
         self._memory_tokens: dict[str, tuple[str, float]] = {}
         self._memory_lock = Lock()
-        self._redis_client = redis.Redis.from_url(settings.CELERY_BROKER_URL, decode_responses=True)
+        
+        # Only create Redis client if URL is configured
+        if settings.CELERY_BROKER_URL:
+            self._redis_client = redis.Redis.from_url(settings.CELERY_BROKER_URL, decode_responses=True)
+        else:
+            self._redis_client = None
 
     def remember(self, jti: str, user_id: int, expires_in: int) -> None:
         if not jti:
@@ -52,7 +57,7 @@ class SocketTokenStore:
                     nx=True,
                 )
             )
-        except RedisError:
+        except (AttributeError, RedisError):
             return False
 
     def _consume_redis(self, jti: str, user_id: int) -> bool | None:
