@@ -3,8 +3,10 @@ from app.config import settings
 from app.database import SessionLocal
 from app.services.email import send_email
 
-celery_app = Celery("devtrack", broker=settings.CELERY_BROKER_URL, backend=settings.CELERY_RESULT_BACKEND)
-
+if settings.CELERY_BROKER_URL and settings.CELERY_RESULT_BACKEND:
+    celery_app = Celery("devtrack", broker=settings.CELERY_BROKER_URL, backend=settings.CELERY_RESULT_BACKEND)
+else:
+    celery_app = None
 
 @celery_app.task
 def send_reminder_email(reminder_id: int, user_email: str, message: str):
