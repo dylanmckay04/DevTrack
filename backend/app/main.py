@@ -1,13 +1,31 @@
 import logging
+import os
+import time
+import sqlalchemy
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from app.core.limiter import limiter
+from app.database import engine
 from app.routers import auth, applications, documents, reminders, websocket
 
 logger = logging.getLogger(__name__)
+
+def wait_for_db(retries=10, delay=3):
+    for attempt in range(retries):
+        try:
+            with engine.connect():
+                logger.info("Database is ready")
+                return
+        except sqlalchemy.exc.OperationalError:
+            logger.warning("Database not ready, retrying in %ds... (attempt %d/%d)", delay, attempt + 1, retries)
+            time.sleep(delay)
+    raise Exception("Could not connect to database after multiple retries")
+
+if not os.getenv("TESTING"):
+        wait_for_db()
 
 app = FastAPI(title="DevTrack")
 app.state.limiter = limiter
