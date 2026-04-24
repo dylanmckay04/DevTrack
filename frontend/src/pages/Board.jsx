@@ -57,7 +57,7 @@ export default function Board() {
       .finally(() => setLoading(false))
   }, [])
 
-  const handleCreated = (app) => setApplications((prev) => [...prev, app])
+  const handleCreated = (app) => setApplications((prev) => replaceApplication(prev, app))
 
   const handleDragStart = (event) => {
     const applicationId = event.active.data.current?.applicationId
