@@ -4,6 +4,7 @@ import { useAuth } from './hooks/useAuth'
 import Navbar from './components/Navbar'
 import Login from './pages/Login'
 import Register from './pages/Register'
+import GitHubCallback from './pages/GitHubCallback'
 import Board from './pages/Board'
 import ApplicationDetail from './pages/ApplicationDetail'
 import Analytics from './pages/Analytics'
@@ -22,6 +23,7 @@ function AppRoutes() {
       <Routes>
         <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
         <Route path="/register" element={user ? <Navigate to="/" replace /> : <Register />} />
+        <Route path="/auth/github/callback" element={<GitHubCallback />} />
         <Route path="/" element={<ProtectedRoute><Board /></ProtectedRoute>} />
         <Route path="/applications/:id" element={<ProtectedRoute><ApplicationDetail /></ProtectedRoute>} />
         <Route path="/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />

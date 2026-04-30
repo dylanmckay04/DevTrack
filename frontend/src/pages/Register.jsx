@@ -51,6 +51,13 @@ export default function Register() {
             {loading ? 'creating account...' : '$ register'}
           </button>
         </form>
+        <div style={styles.divider}>or</div>
+        <a
+          href={`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/auth/github`}
+          style={styles.githubBtn}
+        >
+          $ register with github
+        </a>
         <p style={styles.footer}>
           have an account? <Link to="/login">login</Link>
         </p>
@@ -69,5 +76,18 @@ const styles = {
   field: { display: 'flex', flexDirection: 'column', gap: '6px' },
   label: { color: 'var(--text-secondary)', fontSize: '11px' },
   error: { color: 'var(--red)', fontSize: '11px' },
+  divider: { textAlign: 'center', color: 'var(--text-muted)', fontSize: '11px', margin: '16px 0 0' },
+  githubBtn: {
+    display: 'block',
+    marginTop: '8px',
+    padding: '8px',
+    textAlign: 'center',
+    border: '1px solid var(--border)',
+    borderRadius: 'var(--radius)',
+    color: 'var(--text-secondary)',
+    fontSize: '12px',
+    textDecoration: 'none',
+    fontFamily: 'inherit',
+  },
   footer: { marginTop: '20px', color: 'var(--text-muted)', fontSize: '11px', textAlign: 'center' },
 }
