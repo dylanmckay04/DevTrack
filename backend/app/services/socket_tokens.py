@@ -45,13 +45,26 @@ class SocketTokenStore:
         async with self._memory_lock:
             self._purge_expired_locked()
             import time
-            entry = self._memory_tokens.pop(jti, None)
+            entry = self._memory_tokens.get(jti)
 
         if not entry:
             return False
 
         stored_user_id, _ = entry
         return stored_user_id == str(user_id)
+
+    async def remove(self, jti: str) -> None:
+        """Remove token after disconnect - doesn't fail if missing"""
+        if not jti:
+            return
+        
+        try:
+            await self._redis_client.delete(self._key(jti))
+        except (AttributeError, RedisError):
+            pass
+        
+        async with self._memory_lock:
+            self._memory_tokens.pop(jti, None)
 
     async def _remember_redis(self, jti: str, user_id: int, expires_in: int) -> bool:
         try:

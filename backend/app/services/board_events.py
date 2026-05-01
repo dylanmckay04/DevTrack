@@ -75,9 +75,15 @@ class ConnectionManager:
 
     async def _send_to_local(self, user_id: int, message: dict[str, Any]):
         sent_count = 0
+        seen_connections = set()
         for connection, connection_user_id in self.active_connections:
             if connection_user_id != user_id:
                 continue
+            # Deduplicate: skip if we've already sent to this connection object
+            conn_id = id(connection)
+            if conn_id in seen_connections:
+                continue
+            seen_connections.add(conn_id)
             try:
                 print(f"DEBUG: Sending message to user_id={user_id}, type={message.get('type')}", flush=True)
                 await connection.send_json(message)

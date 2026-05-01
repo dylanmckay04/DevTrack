@@ -1,111 +1,156 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useCallback } from 'react'
 import { getSocketToken } from '../services/api'
 
-export function useWebSocket(onMessage, onReconnect) {
-  const wsRef = useRef(null)
-  const disposedRef = useRef(false)
-  const reconnectTimerRef = useRef(null)
-  
-  // Use refs for callbacks to avoid dependency issues
-  const onMessageRef = useRef(onMessage)
-  const onReconnectRef = useRef(onReconnect)
-    
-  // Update refs when callbacks change
-  onMessageRef.current = onMessage
-  onReconnectRef.current = onReconnect
+// Singleton WebSocket manager to survive React StrictMode remounts
+class WebSocketManager {
+  constructor() {
+    this.ws = null
+    this.listeners = new Set()
+    this.reconnectTimer = null
+    this.disposed = false
+    this.connecting = false
+  }
 
-  useEffect(() => {
-    disposedRef.current = false
-    console.log('[ws] mounting')
-    
-    const connect = async () => {
-      // Clear any existing reconnect timer
-      if (reconnectTimerRef.current) {
-        clearTimeout(reconnectTimerRef.current)
-        reconnectTimerRef.current = null
-      }
-      
-      try {
-        const response = await getSocketToken()
-        if (disposedRef.current) return
+  connect() {
+    if (this.disposed || this.connecting || this.ws) return
 
-        console.log('[ws] connecting...')
+    this.connecting = true
 
-        const ws = new WebSocket(`ws://localhost:8000/ws/board?token=${response.data.socket_token}`)
-        wsRef.current = ws
+    getSocketToken()
+      .then(response => {
+        if (this.disposed) return
+
+        const ws = new WebSocket(`ws://${window.location.hostname}:8000/ws/board?token=${response.data.socket_token}`)
+        this.ws = ws
+        this.connecting = false
 
         ws.onopen = () => {
-          console.log('[ws] connected')
-          if (onReconnectRef.current) {
-            onReconnectRef.current()
+          if (this.ws === ws) {
+            this.notifyReconnect()
           }
         }
 
         ws.onmessage = (event) => {
-          try {
-            const data = JSON.parse(event.data)
-            console.log('[ws] received:', data.type)
-            onMessageRef.current?.(data)
-          } catch (e) {
-            console.error('[ws] error handling message:', e)
+          if (this.ws === ws) {
+            try {
+              const data = JSON.parse(event.data)
+              this.notifyMessage(data)
+            } catch (e) {
+              console.error('[ws] error handling message:', e)
+            }
           }
         }
 
-        ws.onclose = (event) => {
-          console.log(`[ws] closed (code=${event.code})`)
-          // ONLY clear ref if this is still the current WebSocket
-          if (wsRef.current === ws) {
-            wsRef.current = null
+        ws.onclose = () => {
+          if (this.ws === ws) {
+            this.ws = null
           }
-          if (!disposedRef.current) {
-            // Reconnect after 3 seconds
-            reconnectTimerRef.current = setTimeout(() => {
-              reconnectTimerRef.current = null
-              if (!disposedRef.current) {
-                connect()
+          if (!this.disposed) {
+            this.reconnectTimer = setTimeout(() => {
+              this.reconnectTimer = null
+              if (!this.disposed && !this.ws) {
+                this.connect()
               }
             }, 3000)
           }
         }
 
-        ws.onerror = (event) => {
-          console.error('[ws] error:', event)
+        ws.onerror = () => {
+          if (this.ws === ws) {
+            console.error('[ws] error')
+          }
         }
-
-      } catch (error) {
+      })
+      .catch(error => {
+        this.connecting = false
         console.error('[ws] connection error:', error)
-        if (!disposedRef.current) {
-          reconnectTimerRef.current = setTimeout(() => {
-            reconnectTimerRef.current = null
-            if (!disposedRef.current) {
-              connect()
+        if (!this.disposed) {
+          this.reconnectTimer = setTimeout(() => {
+            this.reconnectTimer = null
+            if (!this.disposed && !this.ws) {
+              this.connect()
             }
           }, 5000)
         }
+      })
+  }
+
+  notifyMessage(data) {
+    this.listeners.forEach(listener => {
+      if (listener.onMessage) {
+        listener.onMessage(data)
       }
+    })
+  }
+
+  notifyReconnect() {
+    this.listeners.forEach(listener => {
+      if (listener.onReconnect) {
+        listener.onReconnect()
+      }
+    })
+  }
+
+  addListener(listener) {
+    this.listeners.add(listener)
+    // If already connected, trigger reconnect callback
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      listener.onReconnect?.()
+    }
+  }
+
+  removeListener(listener) {
+    this.listeners.delete(listener)
+  }
+
+  dispose() {
+    this.disposed = true
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer)
+      this.reconnectTimer = null
+    }
+    if (this.ws) {
+      const ws = this.ws
+      ws.onclose = null
+      ws.onerror = null
+      ws.close()
+      this.ws = null
+    }
+  }
+}
+
+// Singleton instance
+let manager = null
+
+export function useWebSocket(onMessage, onReconnect) {
+  const listenerRef = useRef(null)
+
+  useEffect(() => {
+    // Create singleton on first use
+    if (!manager) {
+      manager = new WebSocketManager()
     }
 
-    connect()
+    // Create listener object
+    const listener = {
+      onMessage,
+      onReconnect,
+    }
+    listenerRef.current = listener
+    manager.addListener(listener)
+
+    // Start connection if not already connected
+    manager.connect()
 
     return () => {
-      console.log('[ws] unmounting')
-      disposedRef.current = true
-      
-      // Clear reconnect timer
-      if (reconnectTimerRef.current) {
-        clearTimeout(reconnectTimerRef.current)
-        reconnectTimerRef.current = null
-      }
-      
-      // Close WebSocket without triggering reconnect
-      if (wsRef.current) {
-        const ws = wsRef.current
-        ws.onclose = null // Prevent reconnect
-        ws.close()
-        wsRef.current = null
+      // Remove listener but DON'T dispose the manager
+      // This allows the connection to persist across StrictMode remounts
+      if (listenerRef.current) {
+        manager.removeListener(listenerRef.current)
+        listenerRef.current = null
       }
     }
-  }, []) // Empty deps - only run on mount
+  }, [])
 
   return {}
 }

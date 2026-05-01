@@ -41,4 +41,5 @@ async def board_websocket(websocket: WebSocket):
         logger.error("WebSocket error for user_id=%d: %s", user_id, e)
     finally:
         manager.disconnect(websocket, user_id)
+        await socket_token_store.remove(jti)
         print(f"DEBUG: WebSocket cleanup done for user_id={user_id}", flush=True)
