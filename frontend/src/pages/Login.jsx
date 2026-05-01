@@ -70,6 +70,12 @@ export default function Login() {
         >
           $ login with github
         </a>
+        <a
+          href={`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/auth/google`}
+          style={styles.githubBtn}
+        >
+          $ login with google
+        </a>
         <p style={styles.footer}>
           no account? <Link to="/register">register</Link>
         </p>

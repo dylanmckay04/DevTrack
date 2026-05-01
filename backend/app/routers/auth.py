@@ -121,3 +121,64 @@ async def github_callback(code: str, db: Session = Depends(get_db)):
 
     token = create_access_token({"sub": str(user.id)})
     return RedirectResponse(f"{settings.FRONTEND_URL}/auth/github/callback?token={token}")
+
+
+@router.get("/google")
+def google_login():
+    if not settings.GOOGLE_CLIENT_ID or not settings.GOOGLE_REDIRECT_URI:
+        raise HTTPException(status_code=503, detail="Google OAuth not configured")
+    params = urlencode({
+        "client_id": settings.GOOGLE_CLIENT_ID,
+        "redirect_uri": settings.GOOGLE_REDIRECT_URI,
+        "response_type": "code",
+        "scope": "openid email profile",
+        "access_type": "offline",
+    })
+    return RedirectResponse(f"https://accounts.google.com/o/oauth2/v2/auth?{params}")
+
+
+@router.get("/google/callback")
+async def google_callback(code: str, db: Session = Depends(get_db)):
+    if not settings.GOOGLE_CLIENT_ID or not settings.GOOGLE_CLIENT_SECRET:
+        raise HTTPException(status_code=503, detail="Google OAuth not configured")
+
+    async with httpx.AsyncClient() as client:
+        token_res = await client.post(
+            "https://oauth2.googleapis.com/token",
+            data={
+                "client_id": settings.GOOGLE_CLIENT_ID,
+                "client_secret": settings.GOOGLE_CLIENT_SECRET,
+                "code": code,
+                "redirect_uri": settings.GOOGLE_REDIRECT_URI,
+                "grant_type": "authorization_code",
+            },
+        )
+    google_token = token_res.json().get("access_token")
+    if not google_token:
+        raise HTTPException(status_code=400, detail="Google OAuth failed")
+
+    async with httpx.AsyncClient() as client:
+        user_res = await client.get(
+            "https://www.googleapis.com/oauth2/v2/userinfo",
+            headers={"Authorization": f"Bearer {google_token}"},
+        )
+    google_user = user_res.json()
+    google_id = str(google_user["id"])
+    email = google_user.get("email")
+
+    if not email:
+        raise HTTPException(status_code=400, detail="Google account has no email")
+
+    user = db.query(User).filter(User.google_id == google_id).first()
+    if not user:
+        user = db.query(User).filter(User.email == email).first()
+        if user:
+            user.google_id = google_id
+        else:
+            user = User(email=email, google_id=google_id)
+            db.add(user)
+        db.commit()
+        db.refresh(user)
+
+    token = create_access_token({"sub": str(user.id)})
+    return RedirectResponse(f"{settings.FRONTEND_URL}/auth/google/callback?token={token}")

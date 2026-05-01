@@ -11,6 +11,7 @@ class User(Base):
     email = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=True)
     github_id = Column(String, unique=True, nullable=True, index=True)
+    google_id = Column(String, unique=True, nullable=True, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     applications = relationship("Application", back_populates="owner", cascade="all, delete")

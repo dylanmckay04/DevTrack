@@ -58,6 +58,12 @@ export default function Register() {
         >
           $ register with github
         </a>
+        <a
+          href={`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/auth/google`}
+          style={styles.githubBtn}
+        >
+          $ register with google
+        </a>
         <p style={styles.footer}>
           have an account? <Link to="/login">login</Link>
         </p>
