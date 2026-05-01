@@ -50,6 +50,7 @@ export const uploadDocument = (appId, file) => {
   })
 }
 export const deleteDocument = (appId, docId) => api.delete(`/applications/${appId}/documents/${docId}`)
+export const getDocumentPreviewUrl = (appId, docId) => api.get(`/applications/${appId}/documents/${docId}/preview`)
 
 // Reminders
 export const getReminders = () => api.get('/reminders')

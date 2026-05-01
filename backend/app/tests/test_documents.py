@@ -4,6 +4,7 @@ import app.routers.documents as doc_router
 
 
 FAKE_R2_KEY = "users/1/documents/fake-uuid.pdf"
+FAKE_PRESIGNED_URL = "https://example.com/presigned?token=abc"
 
 
 @pytest.fixture(autouse=True)
@@ -14,6 +15,7 @@ def mock_r2(monkeypatch):
 
     monkeypatch.setattr(doc_router, "upload_file", fake_upload)
     monkeypatch.setattr(doc_router, "delete_file", lambda key: None)
+    monkeypatch.setattr(doc_router, "get_presigned_url", lambda key: FAKE_PRESIGNED_URL)
 
 
 def _pdf_file():
@@ -93,3 +95,40 @@ def test_upload_rejects_oversized_file(auth_client, monkeypatch):
     )
     assert response.status_code == 400
     assert "too large" in response.json()["detail"]
+
+def test_get_document_preview_pdf(auth_client):
+    create = auth_client.post("/applications", json={
+        "company": "Test Inc.",
+        "role": "Backend Engineer"
+    })
+    app_id = create.json()["id"]
+    upload = auth_client.post(f"/applications/{app_id}/documents", files={"file": _pdf_file()})
+    doc_id = upload.json()["id"]
+    response = auth_client.get(f"/applications/{app_id}/documents/{doc_id}/preview")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["url"] == FAKE_PRESIGNED_URL
+    assert data["content_type"] == "application/pdf"
+
+def test_get_document_preview_word(auth_client):
+    create = auth_client.post("/applications", json={
+        "company": "Test Inc.",
+        "role": "Backend Engineer"
+    })
+    app_id = create.json()["id"]
+    upload = auth_client.post(f"/applications/{app_id}/documents", files={"file": ("resume.docx", BytesIO(b"fake docx"), "application/vnd.openxmlformats-officedocument.wordprocessingml.document")})
+    doc_id = upload.json()["id"]
+    response = auth_client.get(f"/applications/{app_id}/documents/{doc_id}/preview")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["url"] == FAKE_PRESIGNED_URL
+    assert data["content_type"] == "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+
+def test_get_document_preview_not_found(auth_client):
+    create = auth_client.post("/applications", json={
+        "company": "Test Inc.",
+        "role": "Backend Engineer"
+    })
+    app_id = create.json()["id"]
+    response = auth_client.get(f"/applications/{app_id}/documents/9999/preview")
+    assert response.status_code == 404

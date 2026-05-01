@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { getApplication, updateApplication, updateStatus, deleteApplication, getDocuments, uploadDocument, deleteDocument, getReminders, deleteReminder } from '../services/api'
+import { getApplication, updateApplication, updateStatus, deleteApplication, getDocuments, uploadDocument, deleteDocument, getDocumentPreviewUrl, getReminders, deleteReminder } from '../services/api'
 import ReminderModal from '../components/ReminderModal'
 
 const STATUSES = ['applied', 'interviewing', 'offer', 'rejected']
@@ -17,6 +17,8 @@ export default function ApplicationDetail() {
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
   const [showReminderModal, setShowReminderModal] = useState(false)
+  const [previewing, setPreviewing] = useState(null)
+  const [previewUrl, setPreviewUrl] = useState(null)
 
   useEffect(() => {
     Promise.all([getApplication(id), getDocuments(id), getReminders()])
@@ -59,8 +61,24 @@ export default function ApplicationDetail() {
   }
 
   const handleDeleteDoc = async (docId) => {
+    if (previewing === docId) setPreviewing(null)
     await deleteDocument(id, docId)
     setDocuments((prev) => prev.filter((d) => d.id !== docId))
+  }
+
+  const handlePreview = async (doc) => {
+    if (previewing === doc.id) {
+      setPreviewing(null)
+      setPreviewUrl(null)
+      return
+    }
+    const res = await getDocumentPreviewUrl(id, doc.id)
+    if (doc.filename.toLowerCase().endsWith('.pdf')) {
+      setPreviewing(doc.id)
+      setPreviewUrl(res.data.url)
+    } else {
+      window.open(res.data.url, '_blank')
+    }
   }
 
   const handleReminderCreated = (reminder) => {
@@ -167,9 +185,17 @@ export default function ApplicationDetail() {
           {documents.length === 0
             ? <p style={styles.empty}>no documents uploaded</p>
             : documents.map((doc) => (
-                <div key={doc.id} style={styles.docRow}>
-                  <span style={styles.docName}>{doc.filename}</span>
-                  <button className="danger" onClick={() => handleDeleteDoc(doc.id)} style={{ fontSize: '10px', padding: '2px 8px' }}>remove</button>
+                <div key={doc.id}>
+                  <div style={styles.docRow}>
+                    <span style={styles.docName}>{doc.filename}</span>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <button onClick={() => handlePreview(doc)} style={{ fontSize: '10px', padding: '2px 8px' }}>{previewing === doc.id ? 'close' : 'preview'}</button>
+                      <button className="danger" onClick={() => handleDeleteDoc(doc.id)} style={{ fontSize: '10px', padding: '2px 8px' }}>remove</button>
+                    </div>
+                  </div>
+                  {previewing === doc.id && previewUrl && (
+                    <iframe src={previewUrl} style={styles.previewFrame} title={doc.filename} />
+                  )}
                 </div>
               ))
           }
@@ -223,6 +249,7 @@ const styles = {
   docName: { fontSize: '11px', color: 'var(--text-secondary)' },
   remName: { fontSize: '11px', color: 'var(--text-secondary)' },
   uploadBtn: { fontSize: '11px', color: 'var(--accent)', cursor: 'pointer', border: '1px solid var(--accent)', padding: '4px 10px', borderRadius: 'var(--radius)', background: 'var(--accent-dim)' },
+  previewFrame: { width: '100%', height: '500px', border: '1px solid var(--border)', borderRadius: 'var(--radius)', marginTop: '10px' },
   remindBtn: { fontSize: '11px', color: 'var(--accent)', cursor: 'pointer', border: '1px solid var(--accent)', padding: '4px 10px', borderRadius: 'var(--radius)', background: 'var(--accent-dim)' },
   empty: { color: 'var(--text-muted)', fontSize: '11px' },
 }
