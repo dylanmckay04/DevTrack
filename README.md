@@ -14,6 +14,7 @@ This project is the centerpiece of my portfolio and reflects how I approach soft
 - Security-focused implementation: rate limiting, upload validation, single-use socket tokens with replay protection
 - Testing discipline with integration tests for authentication, authorization, CRUD, upload validation, and realtime edge cases
 - CI pipeline with GitHub Actions running the full suite against real PostgreSQL and Redis service containers
+- Flexible authentication: email/password and OAuth 2.0 (GitHub, Google) with automatic account linking
 - Practical product design for a real user workflow rather than isolated feature demos
 
 ## Features
@@ -26,6 +27,7 @@ This project is the centerpiece of my portfolio and reflects how I approach soft
 - Real-time board updates via WebSockets with automatic reconnect and token refresh
 - Analytics dashboard with application stats and weekly activity charts
 - JWT authentication with bcrypt-sha256 password hashing and short-lived signed WebSocket tokens
+- Google and GitHub OAuth 2.0 sign-up/sign-in with automatic account linking by email
 - Rate limiting on authentication endpoints (5 registrations/min, 10 logins/min) to prevent brute-force and enumeration attacks
 
 ## Key Engineering Highlights
@@ -137,9 +139,14 @@ FastAPI provides strong performance, automatic OpenAPI docs, and native async su
 
 PostgreSQL is a production-grade relational database with strong concurrency and integrity features. It also supports enum types used for application status.
 
+### Why OAuth 2.0 alongside email/password?
+
+Email/password authentication is familiar but creates friction for users who already trust GitHub or Google accounts. OAuth 2.0 reduces signup friction, eliminates password fatigue, and delegates credential security to providers with mature MSA and breach-detection infrastructure. The implementation links OAuth accounts to existing users by email (if a matching email/password account exists) so users can migrate seamlessly. The `hashed_password` column is nullable so OAuth-only users are first-class accounts.
+
 ## Security and Realtime Hardening
 
 - Rate limiting on `/auth/register` (5/min) and `/auth/login` (10/min) to mitigate brute-force and credential-stuffing attacks
+- OAuth 2.0 flows for GitHub and Google: authorization code exchange over HTTPS, scoped token requests (`user:email` for GitHub, `openid email profile` for Google), and primary-email fallback for GitHub accounts without a public email
 - Document upload validation: content-type allowlist (PDF, Word) and 10 MB size cap enforced before any R2 call
 - Server-authoritative board events: application create/update/delete/status changes emit from backend after commit
 - User-scoped delivery: each socket is bound to an authenticated user and receives only that user's events
@@ -193,6 +200,13 @@ alembic upgrade head
 - `SMTP_PORT` (example: `587`)
 - `SMTP_USER`
 - `SMTP_PASSWORD`
+- `GITHUB_CLIENT_ID` (get from `https://github.com/settings/developers`)
+- `GITHUB_CLIENT_SECRET` (get from `https://github.com/settings/developers`)
+- `GITHUB_REDIRECT_URI` (example: `http://localhost/auth/github/callback`)
+- `FRONTEND_URL` (example: `http://localhost:5173`)
+- `GOOGLE_CLIENT_ID` (get from `console.cloud.google.com`)
+- `GOOGLE_CLIENT_SECRET` (get from `console.cloud.google.com`)
+- `GOOGLE_REDIRECT_URI` (example: `http://localhost/auth/google/callback`)
 
 ## API Endpoints
 
@@ -204,6 +218,10 @@ Interactive documentation: https://devtrack-production-5644.up.railway.app/docs
 | --- | --- | --- | --- |
 | POST | /auth/register | Create a new user account | No |
 | POST | /auth/login | Login and receive a JWT token | No |
+| GET | /auth/github | Redirect to GitHub OAuth authorization | No |
+| GET | /auth/github/callback | GitHub OAuth callback handler | No |
+| GET | /auth/google | Redirect to Google OAuth authorization | No |
+| GET | /auth/google/callback | Google OAuth callback handler | No |
 | GET | /auth/me | Get current authenticated user | Yes |
 | POST | /auth/socket-token | Mint short-lived single-use WebSocket token | Yes |
 
@@ -252,5 +270,4 @@ Interactive documentation: https://devtrack-production-5644.up.railway.app/docs
 
 - Presigned URL document preview in the browser
 - Redis pub/sub for multi-instance WebSocket fanout
-- OAuth login (GitHub, Google)
 - Board pagination for large datasets
