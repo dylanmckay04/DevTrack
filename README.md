@@ -23,6 +23,7 @@ This project is the centerpiece of my portfolio and reflects how I approach soft
 - Drag-and-drop Kanban cards with optimistic UI updates and automatic rollback on failed writes
 - Full application CRUD with notes, job URL, and date tracking
 - Document uploads (resume, cover letter) stored in Cloudflare R2, with content-type allowlisting and a 10 MB size cap
+- In-app document preview: PDFs render inline via iframe, Word documents open in a new tab via presigned URLs
 - Scheduled email reminders powered by Celery + Redis, with task IDs persisted so reminders can be cancelled before they fire
 - Real-time board updates via WebSockets with automatic reconnect and token refresh
 - Analytics dashboard with application stats and weekly activity charts
@@ -131,6 +132,10 @@ The `ApplicationStatus` enum constrains status to `applied`, `interviewing`, `of
 
 R2 is S3-compatible (same boto3 patterns) and avoids egress fees, which is cost-effective for frequent document download workflows.
 
+### Why presigned URLs for document preview?
+
+Rather than proxying file content through the FastAPI server (which would consume application memory and bandwidth), presigned URLs grant the frontend direct, time-limited access to R2 objects. This keeps the backend lightweight, shifts transfer costs to Cloudflare, and ensures URLs expire after 1 hour so leaked links become useless. PDF files render inline via a browser-native iframe; Word documents open in a new tab since browsers lack native .doc/.docx rendering.
+
 ### Why FastAPI over Flask?
 
 FastAPI provides strong performance, automatic OpenAPI docs, and native async support that fits WebSockets and background-task workflows.
@@ -148,6 +153,7 @@ Email/password authentication is familiar but creates friction for users who alr
 - Rate limiting on `/auth/register` (5/min) and `/auth/login` (10/min) to mitigate brute-force and credential-stuffing attacks
 - OAuth 2.0 flows for GitHub and Google: authorization code exchange over HTTPS, scoped token requests (`user:email` for GitHub, `openid email profile` for Google), and primary-email fallback for GitHub accounts without a public email
 - Document upload validation: content-type allowlist (PDF, Word) and 10 MB size cap enforced before any R2 call
+- Document preview via presigned R2 URLs: ownership check before URL generation, 1-hour expiration limits exposure of leaked links
 - Server-authoritative board events: application create/update/delete/status changes emit from backend after commit
 - User-scoped delivery: each socket is bound to an authenticated user and receives only that user's events
 - Short-lived socket tokens: frontend requests a dedicated token from `POST /auth/socket-token`
@@ -242,6 +248,7 @@ Interactive documentation: https://devtrack-production-5644.up.railway.app/docs
 | --- | --- | --- | --- |
 | POST | /applications/{id}/documents | Upload document to R2 | Yes |
 | GET | /applications/{id}/documents | List application documents | Yes |
+| GET | /applications/{id}/documents/{doc_id}/preview | Get presigned preview URL | Yes |
 | DELETE | /applications/{id}/documents/{doc_id} | Delete document | Yes |
 
 ### Reminders
@@ -262,7 +269,6 @@ Interactive documentation: https://devtrack-production-5644.up.railway.app/docs
 
 - WebSocket connection state is in-memory, so sync is single-instance only
 - If Redis is unavailable, socket token replay tracking falls back to process-local memory (not shared across instances)
-- Documents cannot yet be previewed in-app (upload/delete only)
 - Reminders cannot be edited after creation
 - No board pagination for very large datasets
 
