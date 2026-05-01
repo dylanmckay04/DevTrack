@@ -53,16 +53,16 @@ export default function Register() {
         </form>
         <div style={styles.divider}>or</div>
         <a
-          href={`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/auth/github`}
-          style={styles.githubBtn}
-        >
-          $ register with github
-        </a>
-        <a
           href={`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/auth/google`}
           style={styles.githubBtn}
         >
           $ register with google
+        </a>
+        <a
+          href={`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/auth/github`}
+          style={styles.githubBtn}
+        >
+          $ register with github
         </a>
         <p style={styles.footer}>
           have an account? <Link to="/login">login</Link>

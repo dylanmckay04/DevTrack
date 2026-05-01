@@ -65,16 +65,16 @@ export default function Login() {
         </form>
         <div style={styles.divider}>or</div>
         <a
-          href={`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/auth/github`}
-          style={styles.githubBtn}
-        >
-          $ login with github
-        </a>
-        <a
           href={`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/auth/google`}
           style={styles.githubBtn}
         >
           $ login with google
+        </a>
+        <a
+          href={`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/auth/github`}
+          style={styles.githubBtn}
+        >
+          $ login with github
         </a>
         <p style={styles.footer}>
           no account? <Link to="/register">register</Link>
