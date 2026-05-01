@@ -87,31 +87,37 @@ class RedisPubSub:
             return
 
         loop = asyncio.get_event_loop()
+        backoff = 1.0
 
-        try:
-            while True:
-                message = await loop.run_in_executor(None, self._pubsub.get_message, True, 1.0)
+        while True:
+            try:
+                while True:
+                    message = await loop.run_in_executor(None, self._pubsub.get_message, True, 1.0)
 
-                if message and message.get("type") == "message":
-                    channel = message.get("channel")
-                    data = message.get("data")
+                    if message and message.get("type") == "message":
+                        channel = message.get("channel")
+                        data = message.get("data")
 
-                    if channel and data:
-                        handler = self._handlers.get(channel)
-                        if handler:
-                            try:
-                                parsed = json.loads(data)
-                                await handler(channel, parsed)
-                            except (json.JSONDecodeError, TypeError) as e:
-                                logger.warning("Failed to parse message on %s: %s", channel, e)
+                        if channel and data:
+                            handler = self._handlers.get(channel)
+                            if handler:
+                                try:
+                                    parsed = json.loads(data)
+                                    await handler(channel, parsed)
+                                except Exception as e:
+                                    logger.warning("Error handling message on %s: %s", channel, e)
 
-                await asyncio.sleep(0.01)
+                    await asyncio.sleep(0.01)
 
-        except asyncio.CancelledError:
-            logger.info("Redis pub/sub listener cancelled")
-            raise
-        except (RedisError, AttributeError) as e:
-            logger.error("Redis pub/sub listener error: %s", e)
+            except asyncio.CancelledError:
+                logger.info("Redis pub/sub listener cancelled")
+                raise
+            except Exception as e:
+                logger.error("Redis pub/sub listener error (restarting in %.1fs): %s", backoff, e)
+                await asyncio.sleep(backoff)
+                backoff = min(backoff * 2, 60.0)
+                if not self._pubsub:
+                    return
 
     async def close(self) -> None:
         if self._subscriber_task and not self._subscriber_task.done():

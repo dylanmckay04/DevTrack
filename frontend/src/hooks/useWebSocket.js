@@ -9,7 +9,7 @@ function getReconnectDelay(attempt) {
   return Math.min(BASE_RECONNECT_DELAY_MS * (2 ** attempt), MAX_RECONNECT_DELAY_MS)
 }
 
-export function useWebSocket(onMessage) {
+export function useWebSocket(onMessage, onReconnect) {
   const wsRef = useRef(null)
   const reconnectTimerRef = useRef(null)
   const reconnectAttemptRef = useRef(0)
@@ -41,7 +41,11 @@ export function useWebSocket(onMessage) {
         wsRef.current?.close()
         wsRef.current = createBoardSocket(response.data.socket_token, onMessage, {
           onOpen: () => {
+            const isReconnect = reconnectAttemptRef.current > 0
             reconnectAttemptRef.current = 0
+            if (isReconnect && onReconnect) {
+              onReconnect()
+            }
           },
           onClose: () => {
             if (!disposed) {
@@ -65,7 +69,7 @@ export function useWebSocket(onMessage) {
       }
       wsRef.current?.close()
     }
-  }, [onMessage])
+  }, [onMessage, onReconnect])
 
   const send = (data) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
