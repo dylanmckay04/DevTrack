@@ -1,6 +1,6 @@
 from pydantic import BaseModel, ConfigDict
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 from app.models.application import ApplicationStatus
 
 
@@ -39,3 +39,10 @@ class ApplicationOut(BaseModel):
     updated_at: Optional[datetime]
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class PaginatedApplications(BaseModel):
+    items: List[ApplicationOut]
+    total: int
+    has_more: bool
+    next_cursor: Optional[str] = None

@@ -275,4 +275,3 @@ Interactive documentation: https://devtrack-production-5644.up.railway.app/docs
 ## Future Improvements
 
 - Redis pub/sub for multi-instance WebSocket fanout
-- Board pagination for large datasets

@@ -1,13 +1,59 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
-from typing import List
+from sqlalchemy import or_, and_, func
+from typing import List, Optional
+from datetime import datetime
+from base64 import b64decode, b64encode
 from app.core.dependencies import get_db, get_current_user
 from app.models.user import User
-from app.models.application import Application
-from app.schemas.application import ApplicationCreate, ApplicationUpdate, ApplicationStatusUpdate, ApplicationOut
+from app.models.application import Application, ApplicationStatus
+from app.schemas.application import ApplicationCreate, ApplicationUpdate, ApplicationStatusUpdate, ApplicationOut, PaginatedApplications
 from app.services.board_events import broadcast_application_event, broadcast_delete_event
 
 router = APIRouter()
+
+
+@router.get("/paginated", response_model=PaginatedApplications)
+def get_applications_paginated(
+    cursor: Optional[str] = Query(None),
+    limit: int = Query(20, ge=1, le=50),
+    status_filter: Optional[ApplicationStatus] = Query(None, alias="status"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    query = db.query(Application).filter(Application.owner_id == current_user.id)
+
+    if status_filter:
+        query = query.filter(Application.status == status_filter)
+
+    count_query = query.with_entities(func.count(Application.id))
+    total = count_query.scalar()
+
+    if cursor:
+        decoded = b64decode(cursor).decode()
+        created_at_str, id_str = decoded.split("|", 1)
+        created_at = datetime.fromisoformat(created_at_str)
+        cursor_id = int(id_str)
+        query = query.filter(
+            or_(
+                Application.created_at < created_at,
+                and_(Application.created_at == created_at, Application.id < cursor_id),
+            )
+        )
+
+    applications = query.order_by(Application.created_at.desc(), Application.id.desc()).limit(limit + 1).all()
+
+    has_more = len(applications) > limit
+    if has_more:
+        applications = applications[:-1]
+
+    next_cursor = None
+    if has_more and applications:
+        last = applications[-1]
+        cursor_value = f"{last.created_at.isoformat()}|{last.id}"
+        next_cursor = b64encode(cursor_value.encode()).decode()
+
+    return PaginatedApplications(items=applications, total=total, has_more=has_more, next_cursor=next_cursor)
 
 
 @router.get("", response_model=List[ApplicationOut])

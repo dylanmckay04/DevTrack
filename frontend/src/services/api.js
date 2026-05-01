@@ -34,6 +34,12 @@ export const getSocketToken = () => api.post('/auth/socket-token')
 
 // Applications
 export const getApplications = () => api.get('/applications')
+export const getPaginatedApplications = ({ cursor, limit = 20, status } = {}) => {
+  const params = new URLSearchParams({ limit: String(limit) })
+  if (cursor) params.set('cursor', cursor)
+  if (status) params.set('status', status)
+  return api.get(`/applications/paginated?${params}`)
+}
 export const getApplication = (id) => api.get(`/applications/${id}`)
 export const createApplication = (data) => api.post('/applications', data)
 export const updateApplication = (id, data) => api.patch(`/applications/${id}`, data)

@@ -8,7 +8,7 @@ const COLUMN_META = {
   rejected:     { label: 'rejected',     color: 'var(--red)' },
 }
 
-export default function KanbanColumn({ status, applications }) {
+export default function KanbanColumn({ status, applications, hasMore, loadingMore, onLoadMore }) {
   const meta = COLUMN_META[status]
   const { isOver, setNodeRef } = useDroppable({
     id: `column-${status}`,
@@ -27,6 +27,15 @@ export default function KanbanColumn({ status, applications }) {
           ? <p style={styles.empty}>no applications</p>
           : applications.map((app) => <ApplicationCard key={app.id} app={app} />)
         }
+        {hasMore && (
+          <button
+            onClick={onLoadMore}
+            disabled={loadingMore}
+            style={{ ...styles.loadMore, opacity: loadingMore ? 0.5 : 1 }}
+          >
+            {loadingMore ? 'loading...' : 'load more'}
+          </button>
+        )}
       </div>
     </div>
   )
@@ -67,4 +76,16 @@ const styles = {
   },
   cards: { padding: '12px', overflowY: 'auto', flex: 1 },
   empty: { color: 'var(--text-muted)', fontSize: '11px', textAlign: 'center', padding: '16px 0' },
+  loadMore: {
+    width: '100%',
+    padding: '8px 0',
+    marginTop: '8px',
+    background: 'transparent',
+    border: '1px solid var(--border)',
+    borderRadius: 'var(--radius)',
+    color: 'var(--text-muted)',
+    fontSize: '11px',
+    cursor: 'pointer',
+    transition: 'border-color var(--transition), color var(--transition)',
+  },
 }
