@@ -2,10 +2,10 @@ import { useDroppable } from '@dnd-kit/core'
 import ApplicationCard from './ApplicationCard'
 
 const COLUMN_META = {
-  applied:      { label: 'applied',      color: 'var(--blue)' },
-  interviewing: { label: 'interviewing', color: 'var(--yellow)' },
-  offer:        { label: 'offer',        color: 'var(--accent)' },
-  rejected:     { label: 'rejected',     color: 'var(--red)' },
+  applied:      { label: 'Applied',      color: 'var(--blue)' },
+  interviewing: { label: 'Interviewing', color: 'var(--yellow)' },
+  offer:        { label: 'Offer',        color: 'var(--accent)' },
+  rejected:     { label: 'Rejected',     color: 'var(--red)' },
 }
 
 export default function KanbanColumn({ status, applications, hasMore, loadingMore, onLoadMore }) {
@@ -13,6 +13,8 @@ export default function KanbanColumn({ status, applications, hasMore, loadingMor
   const { isOver, setNodeRef } = useDroppable({
     id: `column-${status}`,
     data: { status },
+    // Disable droppable during drag end to prevent stale highlight
+    disabled: false,
   })
 
   return (

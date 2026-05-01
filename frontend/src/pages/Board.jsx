@@ -163,11 +163,16 @@ export default function Board() {
     setActiveApplicationId(applicationId ?? null)
   }
 
+  const [dragKey, setDragKey] = useState(0)
+  
   const handleDragEnd = async (event) => {
     setActiveApplicationId(null)
     const applicationId = event.active.data.current?.applicationId
     const fromStatus = event.active.data.current?.status
     const targetStatus = event.over?.data.current?.status
+    
+    // Force re-render to clear any stale drag states
+    setDragKey(prev => prev + 1)
 
     if (!applicationId || !targetStatus || !fromStatus || targetStatus === fromStatus) {
       return
@@ -273,10 +278,10 @@ export default function Board() {
           onDragEnd={handleDragEnd}
           onDragCancel={handleDragCancel}
         >
-          <div style={styles.board}>
+          <div style={styles.board} key={dragKey}>
             {STATUSES.map((status) => (
               <KanbanColumn
-                key={status}
+                key={`${status}-${dragKey}`}
                 status={status}
                 applications={filteredColumns[status].items}
                 hasMore={filteredColumns[status].hasMore}
