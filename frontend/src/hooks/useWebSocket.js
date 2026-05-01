@@ -20,7 +20,8 @@ class WebSocketManager {
       .then(response => {
         if (this.disposed) return
 
-        const ws = new WebSocket(`ws://${window.location.hostname}:8000/ws/board?token=${response.data.socket_token}`)
+        const baseUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:8000'
+        const ws = new WebSocket(`${baseUrl}/ws/board?token=${response.data.socket_token}`)
         this.ws = ws
         this.connecting = false
 
