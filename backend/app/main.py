@@ -2,6 +2,7 @@ import logging
 import os
 import time
 import sqlalchemy
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -10,8 +11,16 @@ from slowapi.errors import RateLimitExceeded
 from app.core.limiter import limiter
 from app.database import engine
 from app.routers import auth, applications, documents, reminders, websocket
+from app.services.board_events import manager
 
 logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    yield
+    await manager.close()
+
 
 def wait_for_db(retries=10, delay=3):
     for attempt in range(retries):
@@ -27,7 +36,7 @@ def wait_for_db(retries=10, delay=3):
 if not os.getenv("TESTING"):
         wait_for_db()
 
-app = FastAPI(title="DevTrack")
+app = FastAPI(title="DevTrack", lifespan=lifespan)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 

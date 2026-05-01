@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     SECRET_KEY: str
     CELERY_BROKER_URL: Optional[str] = None
     CELERY_RESULT_BACKEND: Optional[str] = None
+    USE_REDIS_PUBSUB: bool = True
     R2_ACCESS_KEY_ID: str
     R2_SECRET_ACCESS_KEY: str
     R2_ACCOUNT_ID: str

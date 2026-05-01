@@ -10,21 +10,21 @@ router = APIRouter()
 async def board_websocket(websocket: WebSocket):
     token = websocket.query_params.get("token")
     payload = decode_socket_token(token) if token else None
-    user_id = payload.get("sub") if payload else None
+    user_id = int(payload.get("sub")) if payload and payload.get("sub") else None
     jti = payload.get("jti") if payload else None
 
     if user_id is None or jti is None:
         await websocket.close(code=1008)
         return
 
-    if not socket_token_store.consume(jti, int(user_id)):
+    if not socket_token_store.consume(jti, user_id):
         await websocket.close(code=1008)
         return
 
-    await manager.connect(websocket, int(user_id))
+    await manager.connect(websocket, user_id)
     try:
         while True:
             await websocket.receive_text()
     except WebSocketDisconnect:
-        manager.disconnect(websocket)
+        manager.disconnect(websocket, user_id)
 
