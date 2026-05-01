@@ -268,6 +268,5 @@ Interactive documentation: https://devtrack-production-5644.up.railway.app/docs
 
 ## Future Improvements
 
-- Presigned URL document preview in the browser
 - Redis pub/sub for multi-instance WebSocket fanout
 - Board pagination for large datasets
