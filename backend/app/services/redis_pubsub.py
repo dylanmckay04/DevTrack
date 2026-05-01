@@ -16,36 +16,63 @@ ChannelHandler = Callable[[str, dict[str, Any]], Awaitable[None]]
 class RedisPubSub:
     def __init__(self):
         self._redis_client: redis.Redis | None = None
+        self._pubsub_client: redis.Redis | None = None
         self._pubsub: redis.client.PubSub | None = None
         self._subscriber_task: asyncio.Task | None = None
         self._handlers: dict[str, ChannelHandler] = {}
         self._subscribed_channels: set[str] = set()
+        self._connection_healthy: bool = False
 
         if settings.CELERY_BROKER_URL:
             try:
                 self._redis_client = redis.from_url(
-                    settings.CELERY_BROKER_URL, decode_responses=True
+                    settings.CELERY_BROKER_URL,
+                    decode_responses=True,
                 )
+                self._pubsub_client = redis.from_url(
+                    settings.CELERY_BROKER_URL,
+                    decode_responses=True,
+                )
+                logger.info("Redis clients created for pub/sub: %s", settings.CELERY_BROKER_URL)
             except (RedisError, AttributeError) as e:
-                logger.warning("Failed to create Redis client for pub/sub: %s", e)
+                logger.error("Failed to create Redis client for pub/sub: %s", e)
                 self._redis_client = None
+                self._pubsub_client = None
+        else:
+            logger.warning("CELERY_BROKER_URL not set, Redis pub/sub disabled")
+
+    async def _check_connection(self) -> bool:
+        if not self._redis_client:
+            return False
+        try:
+            await self._redis_client.ping()
+            self._connection_healthy = True
+            return True
+        except (RedisError, ConnectionError, OSError) as e:
+            logger.warning("Redis connection check failed: %s", e)
+            self._connection_healthy = False
+            return False
 
     async def publish(self, channel: str, message: dict[str, Any]) -> bool:
         if not self._redis_client:
             return False
 
         try:
+            if not self._connection_healthy:
+                if not await self._check_connection():
+                    return False
             await self._redis_client.publish(
                 channel,
                 json.dumps(message),
             )
             return True
-        except (RedisError, TypeError) as e:
+        except (RedisError, TypeError, ConnectionError, OSError) as e:
             logger.warning("Failed to publish to channel %s: %s", channel, e)
+            self._connection_healthy = False
             return False
 
     async def subscribe(self, channel: str, handler: ChannelHandler) -> bool:
-        if not self._redis_client:
+        if not self._pubsub_client:
             return False
 
         self._handlers[channel] = handler
@@ -55,7 +82,7 @@ class RedisPubSub:
 
         try:
             if self._pubsub is None:
-                self._pubsub = self._redis_client.pubsub()
+                self._pubsub = self._pubsub_client.pubsub(ignore_subscribe_messages=True)
 
             await self._pubsub.subscribe(channel)
             self._subscribed_channels.add(channel)
@@ -86,6 +113,7 @@ class RedisPubSub:
             return
 
         backoff = 1.0
+        logger.info("Redis pub/sub listener started")
 
         while True:
             try:
@@ -103,15 +131,27 @@ class RedisPubSub:
                                 except Exception as e:
                                     logger.warning("Error handling message on %s: %s", channel, e)
 
+                self._connection_healthy = True
+                backoff = 1.0
+
             except asyncio.CancelledError:
                 logger.info("Redis pub/sub listener cancelled")
                 raise
             except Exception as e:
                 logger.error("Redis pub/sub listener error (restarting in %.1fs): %s", backoff, e)
+                self._connection_healthy = False
                 await asyncio.sleep(backoff)
                 backoff = min(backoff * 2, 60.0)
                 if not self._pubsub:
                     return
+                try:
+                    if self._pubsub_client:
+                        self._pubsub = self._pubsub_client.pubsub(ignore_subscribe_messages=True)
+                        for channel in self._subscribed_channels:
+                            await self._pubsub.subscribe(channel)
+                        logger.info("Reconnected to Redis pub/sub, re-subscribed to %d channels", len(self._subscribed_channels))
+                except Exception as reconnect_error:
+                    logger.error("Failed to reconnect pub/sub: %s", reconnect_error)
 
     async def close(self) -> None:
         if self._subscriber_task and not self._subscriber_task.done():
@@ -135,6 +175,13 @@ class RedisPubSub:
             except RedisError as e:
                 logger.warning("Error closing Redis client: %s", e)
             self._redis_client = None
+
+        if self._pubsub_client:
+            try:
+                await self._pubsub_client.aclose()
+            except RedisError as e:
+                logger.warning("Error closing pub/sub client: %s", e)
+            self._pubsub_client = None
 
         self._subscribed_channels.clear()
         self._handlers.clear()

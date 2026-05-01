@@ -9,10 +9,16 @@ class SocketTokenStore:
     def __init__(self):
         self._memory_tokens: dict[str, tuple[str, float]] = {}
         self._memory_lock = asyncio.Lock()
-        
+
         # Only create Redis client if URL is configured
         if settings.CELERY_BROKER_URL:
-            self._redis_client = redis.from_url(settings.CELERY_BROKER_URL, decode_responses=True)
+            self._redis_client = redis.from_url(
+                settings.CELERY_BROKER_URL,
+                decode_responses=True,
+                socket_timeout=5,
+                socket_connect_timeout=5,
+                retry_on_timeout=False,
+            )
         else:
             self._redis_client = None
 

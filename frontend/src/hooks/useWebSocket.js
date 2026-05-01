@@ -1,81 +1,96 @@
 import { useEffect, useRef } from 'react'
 import { getSocketToken } from '../services/api'
-import { createBoardSocket } from '../services/websocket'
-
-const BASE_RECONNECT_DELAY_MS = 1000
-const MAX_RECONNECT_DELAY_MS = 30000
-
-function getReconnectDelay(attempt) {
-  return Math.min(BASE_RECONNECT_DELAY_MS * (2 ** attempt), MAX_RECONNECT_DELAY_MS)
-}
 
 export function useWebSocket(onMessage, onReconnect) {
   const wsRef = useRef(null)
-  const reconnectTimerRef = useRef(null)
-  const reconnectAttemptRef = useRef(0)
+  const disposedRef = useRef(false)
+  
+  // Use refs for callbacks to avoid dependency issues
+  const onMessageRef = useRef(onMessage)
+  const onReconnectRef = useRef(onReconnect)
+  
+  // Update refs when callbacks change
+  onMessageRef.current = onMessage
+  onReconnectRef.current = onReconnect
 
   useEffect(() => {
-    let disposed = false
+    disposedRef.current = false
+    console.log('[ws] mounting')
 
-    const scheduleReconnect = () => {
-      if (disposed || reconnectTimerRef.current) {
-        return
-      }
-
-      const delay = getReconnectDelay(reconnectAttemptRef.current)
-      reconnectAttemptRef.current += 1
-
-      reconnectTimerRef.current = window.setTimeout(() => {
-        reconnectTimerRef.current = null
-        connect()
-      }, delay)
-    }
-
-    async function connect() {
+    const connect = async () => {
       try {
         const response = await getSocketToken()
-        if (disposed) {
-          return
+        if (disposedRef.current) return
+
+        console.log('[ws] connecting...')
+
+        const ws = new WebSocket(`ws://localhost:8000/ws/board?token=${response.data.socket_token}`)
+
+        // Store ref to this specific WebSocket
+        wsRef.current = ws
+
+        ws.onopen = () => {
+          console.log('[ws] connected')
+          onReconnectRef.current?.()
         }
 
-        wsRef.current?.close()
-        wsRef.current = createBoardSocket(response.data.socket_token, onMessage, {
-          onOpen: () => {
-            const isReconnect = reconnectAttemptRef.current > 0
-            reconnectAttemptRef.current = 0
-            if (isReconnect && onReconnect) {
-              onReconnect()
-            }
-          },
-          onClose: () => {
-            if (!disposed) {
-              scheduleReconnect()
-            }
-          },
-        })
+        ws.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data)
+            console.log('[ws] received:', data.type)
+            onMessageRef.current?.(data)
+          } catch (e) {
+            console.error('[ws] error handling message:', e)
+          }
+        }
+
+        ws.onclose = () => {
+          console.log('[ws] closed')
+          // ONLY clear ref if this is still the current WebSocket
+          // (fixes StrictMode bug where old WebSocket onclose fires after new one is created)
+          if (wsRef.current === ws) {
+            wsRef.current = null
+          }
+          if (!disposedRef.current) {
+            // Reconnect after 3 seconds
+            setTimeout(() => {
+              if (!disposedRef.current) {
+                connect()
+              }
+            }, 3000)
+          }
+        }
+
+        ws.onerror = (event) => {
+          console.error('[ws] error:', event)
+        }
+
       } catch (error) {
-        console.error('[ws] failed to fetch socket token', error)
-        scheduleReconnect()
+        console.error('[ws] connection error:', error)
+        if (!disposedRef.current) {
+          setTimeout(() => {
+            if (!disposedRef.current) {
+              connect()
+            }
+          }, 5000)
+        }
       }
     }
 
     connect()
 
     return () => {
-      disposed = true
-      if (reconnectTimerRef.current) {
-        window.clearTimeout(reconnectTimerRef.current)
-        reconnectTimerRef.current = null
+      console.log('[ws] unmounting')
+      disposedRef.current = true
+      if (wsRef.current) {
+        const ws = wsRef.current
+        // Remove onclose handler to prevent it from firing after cleanup
+        ws.onclose = null
+        ws.close()
+        wsRef.current = null
       }
-      wsRef.current?.close()
     }
-  }, [onMessage, onReconnect])
+  }, []) // Empty deps - only run on mount
 
-  const send = (data) => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify(data))
-    }
-  }
-
-  return { send }
+  return {}
 }

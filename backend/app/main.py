@@ -16,6 +16,10 @@ from app.services.socket_tokens import socket_token_store
 
 logger = logging.getLogger(__name__)
 
+# Configure logging for our app modules
+for module in ['app.services.board_events', 'app.routers.websocket', 'app.services.redis_pubsub', 'app.routers.applications']:
+    logging.getLogger(module).setLevel(logging.DEBUG)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

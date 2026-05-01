@@ -67,6 +67,7 @@ export default function Board() {
   }, [columns, fetchColumn])
 
   const handleWsMessage = useCallback((data) => {
+    console.log('[Board] WebSocket message:', data.type)
     const incoming = data.application
     if (!incoming) return
 
@@ -139,6 +140,7 @@ export default function Board() {
   }, [])
 
   const fetchAllColumns = useCallback(() => {
+    console.log('[Board] fetchAllColumns called')
     STATUSES.forEach((s) => fetchColumn(s))
   }, [fetchColumn])
 
