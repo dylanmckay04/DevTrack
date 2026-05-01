@@ -17,7 +17,7 @@ async def board_websocket(websocket: WebSocket):
         await websocket.close(code=1008)
         return
 
-    if not socket_token_store.consume(jti, user_id):
+    if not await socket_token_store.consume(jti, user_id):
         await websocket.close(code=1008)
         return
 

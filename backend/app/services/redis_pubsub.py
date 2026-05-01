@@ -3,7 +3,7 @@ import json
 import logging
 from typing import Any, Callable, Awaitable
 
-import redis
+import redis.asyncio as redis
 from redis.exceptions import RedisError
 
 from app.config import settings
@@ -23,7 +23,7 @@ class RedisPubSub:
 
         if settings.CELERY_BROKER_URL:
             try:
-                self._redis_client = redis.Redis.from_url(
+                self._redis_client = redis.from_url(
                     settings.CELERY_BROKER_URL, decode_responses=True
                 )
             except (RedisError, AttributeError) as e:
@@ -35,8 +35,7 @@ class RedisPubSub:
             return False
 
         try:
-            await asyncio.to_thread(
-                self._redis_client.publish,
+            await self._redis_client.publish(
                 channel,
                 json.dumps(message),
             )
@@ -58,7 +57,7 @@ class RedisPubSub:
             if self._pubsub is None:
                 self._pubsub = self._redis_client.pubsub()
 
-            await asyncio.to_thread(self._pubsub.subscribe, channel)
+            await self._pubsub.subscribe(channel)
             self._subscribed_channels.add(channel)
 
             if self._subscriber_task is None or self._subscriber_task.done():
@@ -74,7 +73,7 @@ class RedisPubSub:
             return False
 
         try:
-            await asyncio.to_thread(self._pubsub.unsubscribe, channel)
+            await self._pubsub.unsubscribe(channel)
             self._subscribed_channels.discard(channel)
             self._handlers.pop(channel, None)
             return True
@@ -86,14 +85,11 @@ class RedisPubSub:
         if not self._pubsub:
             return
 
-        loop = asyncio.get_event_loop()
         backoff = 1.0
 
         while True:
             try:
-                while True:
-                    message = await loop.run_in_executor(None, self._pubsub.get_message, True, 1.0)
-
+                async for message in self._pubsub.listen():
                     if message and message.get("type") == "message":
                         channel = message.get("channel")
                         data = message.get("data")
@@ -106,8 +102,6 @@ class RedisPubSub:
                                     await handler(channel, parsed)
                                 except Exception as e:
                                     logger.warning("Error handling message on %s: %s", channel, e)
-
-                    await asyncio.sleep(0.01)
 
             except asyncio.CancelledError:
                 logger.info("Redis pub/sub listener cancelled")
@@ -129,15 +123,15 @@ class RedisPubSub:
 
         if self._pubsub:
             try:
-                await asyncio.to_thread(self._pubsub.unsubscribe)
-                await asyncio.to_thread(self._pubsub.close)
+                await self._pubsub.unsubscribe()
+                await self._pubsub.aclose()
             except RedisError as e:
                 logger.warning("Error closing pubsub: %s", e)
             self._pubsub = None
 
         if self._redis_client:
             try:
-                await asyncio.to_thread(self._redis_client.close)
+                await self._redis_client.aclose()
             except RedisError as e:
                 logger.warning("Error closing Redis client: %s", e)
             self._redis_client = None
