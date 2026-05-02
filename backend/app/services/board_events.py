@@ -23,7 +23,7 @@ class ConnectionManager:
 
         if user_id not in self._channel_handlers:
             channel = _user_channel(user_id)
-            await self._pubsub.subscribe(channel, self._make_handler(user_id))
+            asyncio.create_task(self._pubsub.subscribe(channel, self._make_handler(user_id)))
             self._channel_handlers[user_id] = 1
         else:
             self._channel_handlers[user_id] = self._channel_handlers.get(user_id, 0) + 1
@@ -45,7 +45,7 @@ class ConnectionManager:
     async def broadcast_to_user(self, user_id: int, message: dict[str, Any]):
         await self._send_to_local(user_id, message)
         redis_message = {**message, "_instance_id": self._instance_id}
-        await self._pubsub.publish(_user_channel(user_id), redis_message)
+        asyncio.create_task(self._pubsub.publish(_user_channel(user_id), redis_message))
 
     async def handle_redis_message(self, user_id: int, message: dict[str, Any]):
         if message.get("_instance_id") == self._instance_id:
