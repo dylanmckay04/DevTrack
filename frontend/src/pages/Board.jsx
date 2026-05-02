@@ -280,12 +280,11 @@ export default function Board() {
                 hasMore={filteredColumns[status].hasMore}
                 loadingMore={filteredColumns[status].loadingMore}
                 onLoadMore={() => handleLoadMore(status)}
-              isDragActive={activeApplicationId !== null}
               />
             ))}
           </div>
           <DragOverlay>
-            {activeApplication ? <ApplicationCard app={activeApplication} /> : null}
+            {activeApplication ? <ApplicationCard app={activeApplication} isDragOverlay /> : null}
           </DragOverlay>
         </DndContext>
       )}
