@@ -150,21 +150,22 @@ export default function Board() {
   }, [])
 
   const fetchAllColumns = useCallback(() => {
-    console.log('[Board] fetchAllColumns called')
     STATUSES.forEach((s) => fetchColumn(s))
   }, [fetchColumn])
 
   useWebSocket(handleWsMessage, fetchAllColumns)
 
-
   const handleCreated = useCallback((app) => {
-    // Set fallback timeout - will be cleared when WebSocket message is received
-    fetchAllRef.current = setTimeout(() => {
-      console.log('[Board] WebSocket message not received, refetching...')
-      fetchAllColumns()
-      fetchAllRef.current = null
-    }, 3000)
-  }, [fetchAllColumns])
+    setColumns((prev) => {
+      const col = prev[app.status]
+      if (!col) return prev
+      if (col.items.some((a) => a.id === app.id)) return prev
+      return {
+        ...prev,
+        [app.status]: { ...col, items: [app, ...col.items] },
+      }
+    })
+  }, [])
 
   const handleDragStart = (event) => {
     const applicationId = event.active.data.current?.applicationId
@@ -299,7 +300,7 @@ export default function Board() {
             ))}
           </div>
           <DragOverlay>
-            {activeApplication ? <ApplicationCard app={activeApplication} /> : null}
+            {activeApplication ? <ApplicationCard app={activeApplication} isDragOverlay /> : null}
           </DragOverlay>
         </DndContext>
       )}

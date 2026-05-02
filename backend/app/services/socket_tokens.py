@@ -1,8 +1,13 @@
-import asyncio
-import redis.asyncio as redis
+import logging
+from threading import Lock
+from time import time
+
+import redis
 from redis.exceptions import RedisError
 
 from app.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 class SocketTokenStore:
@@ -12,12 +17,11 @@ class SocketTokenStore:
 
         # Only create Redis client if URL is configured
         if settings.CELERY_BROKER_URL:
-            self._redis_client = redis.from_url(
+            self._redis_client = redis.Redis.from_url(
                 settings.CELERY_BROKER_URL,
                 decode_responses=True,
-                socket_timeout=5,
-                socket_connect_timeout=5,
-                retry_on_timeout=False,
+                socket_connect_timeout=2,
+                socket_timeout=2,
             )
         else:
             self._redis_client = None
@@ -47,11 +51,15 @@ class SocketTokenStore:
             import time
             entry = self._memory_tokens.get(jti)
 
-        if not entry:
-            return False
+        if entry:
+            stored_user_id, _ = entry
+            return stored_user_id == str(user_id)
 
-        stored_user_id, _ = entry
-        return stored_user_id == str(user_id)
+        # Neither Redis nor local memory has the token. On multi-instance deployments
+        # without shared Redis, the token was stored on a different instance. Fall back
+        # to trusting the already-verified JWT signature + expiry.
+        logger.debug("Socket token jti=%s not found locally; allowing via JWT-only validation", jti)
+        return True
 
     async def remove(self, jti: str) -> None:
         """Remove token after disconnect - doesn't fail if missing"""

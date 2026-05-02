@@ -27,7 +27,7 @@ class ConnectionManager:
 
         if user_id not in self._channel_handlers:
             channel = _user_channel(user_id)
-            await self._pubsub.subscribe(channel, self._make_handler(user_id))
+            asyncio.create_task(self._pubsub.subscribe(channel, self._make_handler(user_id)))
             self._channel_handlers[user_id] = 1
             logger.info("Subscribed to Redis channel %s for user_id=%d", channel, user_id)
         else:
@@ -59,12 +59,7 @@ class ConnectionManager:
         except Exception as e:
             logger.error("Error in _send_to_local for user_id=%d: %s", user_id, e)
         redis_message = {**message, "_instance_id": self._instance_id}
-        try:
-            result = await self._pubsub.publish(_user_channel(user_id), redis_message)
-            if not result:
-                logger.warning("Failed to publish to Redis channel for user_id=%d", user_id)
-        except Exception as e:
-            logger.error("Error publishing to Redis for user_id=%d: %s", user_id, e)
+        asyncio.create_task(self._pubsub.publish(_user_channel(user_id), redis_message))
 
     async def handle_redis_message(self, user_id: int, message: dict[str, Any]):
         if message.get("_instance_id") == self._instance_id:
