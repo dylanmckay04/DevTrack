@@ -15,11 +15,7 @@ class WebSocketManager {
     return this.ws && this.ws.readyState === WebSocket.OPEN
   }
 
-export function useWebSocket(onMessage, onReconnect) {
-  const wsRef = useRef(null)
-  const reconnectTimerRef = useRef(null)
-  const reconnectAttemptRef = useRef(0)
-
+  connect() {
     this.connecting = true
 
     getSocketToken()
@@ -64,22 +60,6 @@ export function useWebSocket(onMessage, onReconnect) {
             }, 3000)
           }
         }
-
-        wsRef.current?.close()
-        wsRef.current = createBoardSocket(response.data.socket_token, onMessage, {
-          onOpen: () => {
-            const isReconnect = reconnectAttemptRef.current > 0
-            reconnectAttemptRef.current = 0
-            if (isReconnect && onReconnect) {
-              onReconnect()
-            }
-          },
-          onClose: () => {
-            if (!disposed) {
-              scheduleReconnect()
-            }
-          }, 5000)
-        }
       })
   }
 
@@ -105,7 +85,7 @@ export function useWebSocket(onMessage, onReconnect) {
     if (this.isConnected()) {
       listener.onReconnect?.()
     }
-  }, [onMessage, onReconnect])
+  }
 
   removeListener(listener) {
     this.listeners.delete(listener)
