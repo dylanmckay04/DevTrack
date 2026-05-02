@@ -276,7 +276,6 @@ Interactive documentation: https://devtrack-production-5644.up.railway.app/docs
 
 - If Redis is unavailable, WebSocket pub/sub and socket token replay tracking falls back to process-local memory (not shared across instances)
 - Reminders cannot be edited after creation
-- No board pagination for very large datasets
 
 ## Future Improvements
 
