@@ -8,7 +8,7 @@ const COLUMN_META = {
   rejected:     { label: 'rejected',     color: 'var(--red)' },
 }
 
-export default function KanbanColumn({ status, applications, hasMore, loadingMore, onLoadMore }) {
+export default function KanbanColumn({ status, applications, hasMore, loadingMore, onLoadMore, isDragActive }) {
   const meta = COLUMN_META[status]
   const { isOver, setNodeRef } = useDroppable({
     id: `column-${status}`,
@@ -16,7 +16,7 @@ export default function KanbanColumn({ status, applications, hasMore, loadingMor
   })
 
   return (
-    <div ref={setNodeRef} style={{ ...styles.column, ...(isOver ? styles.columnOver : null) }}>
+    <div ref={setNodeRef} style={{ ...styles.column, ...(isOver && isDragActive ? styles.columnOver : null) }}>
       <div style={styles.header}>
         <span style={{ ...styles.indicator, background: meta.color }} />
         <span style={styles.label}>{meta.label}</span>

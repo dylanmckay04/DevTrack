@@ -280,6 +280,7 @@ export default function Board() {
                 hasMore={filteredColumns[status].hasMore}
                 loadingMore={filteredColumns[status].loadingMore}
                 onLoadMore={() => handleLoadMore(status)}
+              isDragActive={activeApplicationId !== null}
               />
             ))}
           </div>
