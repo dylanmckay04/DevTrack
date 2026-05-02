@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react'
+import { useEffect, useRef } from 'react'
 import { getSocketToken } from '../services/api'
 
 // Singleton WebSocket manager to survive React StrictMode remounts
@@ -11,8 +11,13 @@ class WebSocketManager {
     this.connecting = false
   }
 
+  isConnected() {
+    return this.ws && this.ws.readyState === WebSocket.OPEN
+  }
+
   connect() {
-    if (this.disposed || this.connecting || this.ws) return
+    if (this.disposed || this.connecting) return
+    if (this.isConnected()) return
 
     this.connecting = true
 
@@ -22,7 +27,6 @@ class WebSocketManager {
 
         const baseUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:8000'
         const ws = new WebSocket(`${baseUrl}/ws/board?token=${response.data.socket_token}`)
-        this.connecting = false
 
         ws.onopen = () => {
           if (this.disposed) {
@@ -30,6 +34,7 @@ class WebSocketManager {
             return
           }
           this.ws = ws
+          this.connecting = false
           console.log('[ws] connected')
           this.notifyReconnect()
         }
@@ -52,7 +57,7 @@ class WebSocketManager {
           if (!this.disposed) {
             this.reconnectTimer = setTimeout(() => {
               this.reconnectTimer = null
-              if (!this.disposed && !this.ws) {
+              if (!this.disposed) {
                 this.connect()
               }
             }, 3000)
@@ -71,7 +76,7 @@ class WebSocketManager {
         if (!this.disposed) {
           this.reconnectTimer = setTimeout(() => {
             this.reconnectTimer = null
-            if (!this.disposed && !this.ws) {
+            if (!this.disposed) {
               this.connect()
             }
           }, 5000)
@@ -98,7 +103,7 @@ class WebSocketManager {
   addListener(listener) {
     this.listeners.add(listener)
     // If already connected, trigger reconnect callback
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+    if (this.isConnected()) {
       listener.onReconnect?.()
     }
   }
@@ -144,7 +149,9 @@ export function useWebSocket(onMessage, onReconnect) {
     manager.addListener(listener)
 
     // Start connection if not already connected
-    manager.connect()
+    if (!manager.isConnected()) {
+      manager.connect()
+    }
 
     return () => {
       // Remove listener but DON'T dispose the manager

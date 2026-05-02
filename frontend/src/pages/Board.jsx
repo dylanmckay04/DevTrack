@@ -77,6 +77,7 @@ export default function Board() {
         if (!prev[status]) return prev
         const exists = prev[status].items.some((a) => a.id === incoming.id)
         if (exists) return prev
+        console.log('[Board] Adding new application:', incoming.id)
         return {
           ...prev,
           [status]: { ...prev[status], items: [incoming, ...prev[status].items] },
@@ -123,6 +124,7 @@ export default function Board() {
     }
 
     if (data.type === 'application.deleted') {
+      console.log('[Board] Removing deleted application:', incoming.id)
       setColumns((prev) => {
         let changed = false
         const updated = {}
@@ -148,10 +150,15 @@ export default function Board() {
 
   const handleCreated = useCallback((app) => {
     // Don't update state here - wait for WebSocket message
-    // Set a fallback timeout to refetch if WebSocket message isn't received
-    setTimeout(() => {
+    // The WebSocket message should handle the update
+    // Fallback: if WebSocket message isn't received within 3 seconds, refetch
+    const timeoutId = setTimeout(() => {
+      console.log('[Board] WebSocket message not received, refetching...')
       fetchAllColumns()
-    }, 2000)
+    }, 3000)
+    
+    // Clear timeout if component unmounts
+    return () => clearTimeout(timeoutId)
   }, [fetchAllColumns])
 
   const handleDragStart = (event) => {
