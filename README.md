@@ -44,17 +44,11 @@ This project is the centerpiece of my portfolio and reflects how I approach soft
 ## Architecture
 
 ```text
-┌─────────────┐     HTTP/WS      ┌─────────────────┐
-│   React     │ ◄──────────────► │  FastAPI #1    │
-│  Frontend   │                  │ (uvicorn + ws)  │
-└─────────────┘                  └────────┬────────┘
-                                        │
-┌─────────────┐     HTTP/WS             │
-│   React     │ ◄──────────────► ┌──────▼────────┐
-│  Frontend   │                  │  FastAPI #2    │
-└─────────────┘                  │ (uvicorn + ws) │
-                                 └──────┬────────┘
-                                        │
+                                 ┌─────────────────┐
+┌─────────────┐     HTTP/WS      │  FastAPI        │
+│   React     │ ◄──────────────► │  (uvicorn + ws) │
+│  Frontend   │                  └────────┬────────┘
+└─────────────┘                           │
                      ┌────────────────────┼─────────────────────┐
                      │                    │                     │
               ┌──────▼──────┐    ┌───────▼────────┐    ┌──────▼────────┐
@@ -73,24 +67,38 @@ This project is the centerpiece of my portfolio and reflects how I approach soft
 
 ### Languages
 
-- Python
-- JavaScript
+- Python 3.12
+- JavaScript (JSX)
 
 ### Frameworks
 
 - FastAPI
-- React
+- React 18
+
+### Frontend Libraries
+
+- React Router DOM — client-side routing
+- @dnd-kit — drag-and-drop Kanban interactions
+- Recharts — analytics charts
+- Axios — HTTP client with auth interceptors
+- Vite — build tool and dev server
+
+### Backend Libraries
+
+- SQLAlchemy ORM + Alembic migrations
+- Pydantic validation
+- Uvicorn ASGI server
+- python-jose — JWT token creation and validation
+- passlib (bcrypt-sha256) — password hashing
+- httpx — async HTTP client for OAuth provider requests
+- slowapi — request rate limiting
 
 ### Platform and Technical Components
 
-- Alembic migrations
-- SQLAlchemy ORM
-- PostgreSQL
-- Pydantic validation
-- Uvicorn app server
-- Cloudflare R2 for document storage
-- Celery + Redis for scheduled reminders
-- slowapi for request rate limiting
+- PostgreSQL — relational database
+- Redis — Celery task broker and WebSocket pub/sub
+- Cloudflare R2 — document storage (S3-compatible, boto3)
+- Celery — distributed task queue for scheduled email reminders
 - User-scoped, server-originated WebSocket board events
 - Pytest suite covering auth, CRUD, upload validation, and WebSocket security/replay hardening
 - GitHub Actions CI (PostgreSQL 16 + Redis 7 service containers)
@@ -179,8 +187,8 @@ Tradeoff note: in-memory connection management and fallback token tracking keep 
 git clone https://github.com/dylanmckay04/DevTrack.git
 ```
 
-2. Create a `.env` file with the variables listed below.
-3. Start services from project root:
+2. Create a `.env` file at the project root with the variables listed below.
+3. Start all services (backend, frontend, PostgreSQL 15, Redis, Celery worker) from the project root:
 
 ```bash
 docker compose up --build
@@ -196,6 +204,8 @@ alembic upgrade head
 5. Verify health endpoint: http://localhost:8000/health
 6. Open frontend: http://localhost:5173
 7. Open local API docs: http://localhost:8000/docs
+
+The frontend reads `VITE_WS_URL` from `frontend/.env.development` (defaults to `ws://localhost:8000`) for WebSocket connections. Update this if running the backend on a different port.
 
 ## Environment Variables
 
@@ -220,6 +230,11 @@ alembic upgrade head
 - `GOOGLE_CLIENT_ID` (get from `console.cloud.google.com`)
 - `GOOGLE_CLIENT_SECRET` (get from `console.cloud.google.com`)
 - `GOOGLE_REDIRECT_URI` (example: `http://localhost/auth/google/callback`)
+- `CELERY_BROKER_URL` (example: `redis://redis:6379/0`, used by the Celery worker; docker-compose sets this automatically)
+
+**Frontend environment variables** (in `frontend/.env.development` / `frontend/.env.production`):
+
+- `VITE_WS_URL` (example: `ws://localhost:8000` for local, `wss://your-api.railway.app` for production)
 
 ## API Endpoints
 
@@ -243,6 +258,7 @@ Interactive documentation: https://devtrack-production-5644.up.railway.app/docs
 | Method | Endpoint | Description | Auth Required |
 | --- | --- | --- | --- |
 | GET | /applications | Get all applications for current user | Yes |
+| GET | /applications/paginated | Cursor-based paginated application listing | Yes |
 | POST | /applications | Create new application | Yes |
 | GET | /applications/{id} | Get one application | Yes |
 | PATCH | /applications/{id} | Update an application | Yes |
@@ -270,7 +286,13 @@ Interactive documentation: https://devtrack-production-5644.up.railway.app/docs
 
 | Protocol | Endpoint | Description |
 | --- | --- | --- |
-| WS | /ws/board | Real-time Kanban board sync |
+| WS | /ws/board?token={socket_token} | Real-time Kanban board sync (token from `POST /auth/socket-token`) |
+
+### Utility
+
+| Method | Endpoint | Description | Auth Required |
+| --- | --- | --- | --- |
+| GET | /health | Service health check | No |
 
 ## Known Limitations
 
@@ -280,3 +302,7 @@ Interactive documentation: https://devtrack-production-5644.up.railway.app/docs
 ## Future Improvements
 
 - Redis cluster support for high availability
+- Reminder editing after creation (currently reminders are immutable once scheduled)
+- Frontend test coverage (unit + integration tests for React components and hooks)
+- Bulk application import (e.g. from CSV)
+- Email verification for new email/password accounts
