@@ -66,9 +66,18 @@ export default function Board() {
     }
   }, [columns, fetchColumn])
 
+  const fetchAllRef = useRef(null)
+
   const handleWsMessage = useCallback((data) => {
+    console.log('[Board] WebSocket message:', data.type)
     const incoming = data.application
     if (!incoming) return
+
+    // Clear any pending fallback timeouts
+    if (fetchAllRef.current) {
+      clearTimeout(fetchAllRef.current)
+      fetchAllRef.current = null
+    }
 
     if (data.type === 'application.created') {
       setColumns((prev) => {
@@ -76,6 +85,7 @@ export default function Board() {
         if (!prev[status]) return prev
         const exists = prev[status].items.some((a) => a.id === incoming.id)
         if (exists) return prev
+        console.log('[Board] Adding new application:', incoming.id)
         return {
           ...prev,
           [status]: { ...prev[status], items: [incoming, ...prev[status].items] },
@@ -122,6 +132,7 @@ export default function Board() {
     }
 
     if (data.type === 'application.deleted') {
+      console.log('[Board] Removing deleted application:', incoming.id)
       setColumns((prev) => {
         let changed = false
         const updated = {}
@@ -161,11 +172,16 @@ export default function Board() {
     setActiveApplicationId(applicationId ?? null)
   }
 
+  const [dragKey, setDragKey] = useState(0)
+  
   const handleDragEnd = async (event) => {
     setActiveApplicationId(null)
     const applicationId = event.active.data.current?.applicationId
     const fromStatus = event.active.data.current?.status
     const targetStatus = event.over?.data.current?.status
+    
+    // Force re-render to clear any stale drag states
+    setDragKey(prev => prev + 1)
 
     if (!applicationId || !targetStatus || !fromStatus || targetStatus === fromStatus) {
       return
@@ -271,10 +287,10 @@ export default function Board() {
           onDragEnd={handleDragEnd}
           onDragCancel={handleDragCancel}
         >
-          <div style={styles.board}>
+          <div style={styles.board} key={dragKey}>
             {STATUSES.map((status) => (
               <KanbanColumn
-                key={status}
+                key={`${status}-${dragKey}`}
                 status={status}
                 applications={filteredColumns[status].items}
                 hasMore={filteredColumns[status].hasMore}
