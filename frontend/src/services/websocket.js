@@ -1,5 +1,5 @@
 const defaultApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
-const WS_URL = import.meta.env.VITE_WS_URL || defaultApiUrl.replace(/^http/, 'ws') + '/ws/board'
+const WS_URL = defaultApiUrl.replace(/^http/, 'ws') + '/ws/board'
 
 export function createBoardSocket(socketToken, onMessage, handlers = {}) {
   const wsUrl = `${WS_URL}?token=${encodeURIComponent(socketToken)}`
@@ -18,7 +18,7 @@ export function createBoardSocket(socketToken, onMessage, handlers = {}) {
 
   ws.onclose = (event) => {
     window.clearInterval(keepAlive)
-    console.log('[ws] disconnected')
+    console.log(`[ws] disconnected (code=${event.code}, reason=${event.reason})`)
     handlers.onClose?.(event)
   }
 
@@ -30,7 +30,12 @@ export function createBoardSocket(socketToken, onMessage, handlers = {}) {
   ws.onmessage = (event) => {
     try {
       const data = JSON.parse(event.data)
-      onMessage(data)
+      console.log('[ws] received message:', data.type)
+      try {
+        onMessage(data)
+      } catch (e) {
+        console.error('[ws] error in onMessage handler:', e)
+      }
     } catch (e) {
       console.error('[ws] failed to parse message', e)
     }

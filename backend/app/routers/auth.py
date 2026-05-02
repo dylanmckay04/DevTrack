@@ -43,9 +43,9 @@ def get_me(current_user: User = Depends(get_current_user)):
 
 
 @router.post("/socket-token", response_model=SocketToken)
-def get_socket_token(current_user: User = Depends(get_current_user)):
+async def get_socket_token(current_user: User = Depends(get_current_user)):
     token, jti = create_socket_token({"sub": str(current_user.id)})
-    socket_token_store.remember(jti, current_user.id, SOCKET_TOKEN_EXPIRE_SECONDS)
+    await socket_token_store.remember(jti, current_user.id, SOCKET_TOKEN_EXPIRE_SECONDS)
     return {
         "socket_token": token,
         "token_type": "socket",

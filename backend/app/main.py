@@ -12,14 +12,20 @@ from app.core.limiter import limiter
 from app.database import engine
 from app.routers import auth, applications, documents, reminders, websocket
 from app.services.board_events import manager
+from app.services.socket_tokens import socket_token_store
 
 logger = logging.getLogger(__name__)
+
+# Configure logging for our app modules
+for module in ['app.services.board_events', 'app.routers.websocket', 'app.services.redis_pubsub', 'app.routers.applications']:
+    logging.getLogger(module).setLevel(logging.DEBUG)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     yield
     await manager.close()
+    await socket_token_store.close()
 
 
 def wait_for_db(retries=10, delay=3):

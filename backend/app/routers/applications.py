@@ -67,7 +67,12 @@ async def create_application(app_in: ApplicationCreate, db: Session = Depends(ge
     db.add(application)
     db.commit()
     db.refresh(application)
-    await broadcast_application_event("application.created", application)
+    print(f"DEBUG: Application created, broadcasting event for app_id={application.id}, owner_id={application.owner_id}", flush=True)
+    try:
+        await broadcast_application_event("application.created", application)
+        print(f"DEBUG: Broadcast completed for app_id={application.id}", flush=True)
+    except Exception as e:
+        print(f"DEBUG: Error broadcasting application event: {e}", flush=True)
     return application
 
 

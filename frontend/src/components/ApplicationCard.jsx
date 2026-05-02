@@ -9,10 +9,11 @@ const STATUS_COLORS = {
   rejected:     'var(--red)',
 }
 
-export default function ApplicationCard({ app }) {
+export default function ApplicationCard({ app, isDragOverlay = false }) {
   const navigate = useNavigate()
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `application-${app.id}`,
+    disabled: isDragOverlay,
     data: {
       applicationId: app.id,
       status: app.status,
@@ -22,7 +23,7 @@ export default function ApplicationCard({ app }) {
     ? new Date(app.applied_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
     : new Date(app.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 
-  const dragStyle = {
+  const dragStyle = isDragOverlay ? { cursor: 'grabbing' } : {
     transform: CSS.Translate.toString(transform),
     opacity: isDragging ? 0.45 : 1,
     cursor: isDragging ? 'grabbing' : 'grab',
@@ -30,11 +31,11 @@ export default function ApplicationCard({ app }) {
 
   return (
     <div
-      ref={setNodeRef}
+      ref={isDragOverlay ? undefined : setNodeRef}
       style={{ ...styles.card, ...dragStyle }}
-      onClick={() => !isDragging && navigate(`/applications/${app.id}`)}
-      {...listeners}
-      {...attributes}
+      onClick={() => !isDragOverlay && !isDragging && navigate(`/applications/${app.id}`)}
+      {...(isDragOverlay ? {} : listeners)}
+      {...(isDragOverlay ? {} : attributes)}
     >
       <div style={styles.top}>
         <span style={styles.company}>{app.company}</span>
