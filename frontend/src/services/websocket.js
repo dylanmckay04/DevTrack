@@ -1,5 +1,5 @@
 const defaultApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
-const WS_URL = import.meta.env.VITE_WS_URL || defaultApiUrl.replace(/^http/, 'ws') + '/ws/board'
+const WS_URL = defaultApiUrl.replace(/^http/, 'ws') + '/ws/board'
 
 export function createBoardSocket(socketToken, onMessage, handlers = {}) {
   const wsUrl = `${WS_URL}?token=${encodeURIComponent(socketToken)}`
