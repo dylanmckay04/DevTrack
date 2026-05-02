@@ -147,16 +147,12 @@ export default function Board() {
   useWebSocket(handleWsMessage, fetchAllColumns)
 
   const handleCreated = useCallback((app) => {
-    setColumns((prev) => {
-      const col = prev[app.status]
-      if (!col) return prev
-      if (col.items.some((a) => a.id === app.id)) return prev
-      return {
-        ...prev,
-        [app.status]: { ...col, items: [app, ...col.items] },
-      }
-    })
-  }, [])
+    // Don't update state here - wait for WebSocket message
+    // Set a fallback timeout to refetch if WebSocket message isn't received
+    setTimeout(() => {
+      fetchAllColumns()
+    }, 2000)
+  }, [fetchAllColumns])
 
   const handleDragStart = (event) => {
     const applicationId = event.active.data.current?.applicationId

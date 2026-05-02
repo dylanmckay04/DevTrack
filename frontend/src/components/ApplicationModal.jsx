@@ -18,11 +18,11 @@ export default function ApplicationModal({ onClose, onCreated }) {
       if (!payload.notes) delete payload.notes
       const res = await createApplication(payload)
       onCreated(res.data)
-      onClose()
     } catch {
       setError('failed to create application')
     } finally {
       setLoading(false)
+      onClose()
     }
   }
 

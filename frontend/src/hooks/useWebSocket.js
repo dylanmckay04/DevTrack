@@ -22,13 +22,16 @@ class WebSocketManager {
 
         const baseUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:8000'
         const ws = new WebSocket(`${baseUrl}/ws/board?token=${response.data.socket_token}`)
-        this.ws = ws
         this.connecting = false
 
         ws.onopen = () => {
-          if (this.ws === ws) {
-            this.notifyReconnect()
+          if (this.disposed) {
+            ws.close()
+            return
           }
+          this.ws = ws
+          console.log('[ws] connected')
+          this.notifyReconnect()
         }
 
         ws.onmessage = (event) => {
