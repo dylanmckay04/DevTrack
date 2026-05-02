@@ -24,7 +24,10 @@ class RedisPubSub:
         if settings.CELERY_BROKER_URL:
             try:
                 self._redis_client = redis.Redis.from_url(
-                    settings.CELERY_BROKER_URL, decode_responses=True
+                    settings.CELERY_BROKER_URL,
+                    decode_responses=True,
+                    socket_connect_timeout=2,
+                    socket_timeout=2,
                 )
             except (RedisError, AttributeError) as e:
                 logger.warning("Failed to create Redis client for pub/sub: %s", e)

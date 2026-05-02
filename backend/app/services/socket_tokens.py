@@ -17,7 +17,12 @@ class SocketTokenStore:
         
         # Only create Redis client if URL is configured
         if settings.CELERY_BROKER_URL:
-            self._redis_client = redis.Redis.from_url(settings.CELERY_BROKER_URL, decode_responses=True)
+            self._redis_client = redis.Redis.from_url(
+                settings.CELERY_BROKER_URL,
+                decode_responses=True,
+                socket_connect_timeout=2,
+                socket_timeout=2,
+            )
         else:
             self._redis_client = None
 
