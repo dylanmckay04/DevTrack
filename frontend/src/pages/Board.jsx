@@ -138,14 +138,23 @@ export default function Board() {
     }
   }, [])
 
-  useWebSocket(handleWsMessage)
+  const fetchAllColumns = useCallback(() => {
+    STATUSES.forEach((s) => fetchColumn(s))
+  }, [fetchColumn])
 
-  const handleCreated = (app) => {
-    setColumns((prev) => ({
-      ...prev,
-      [app.status]: { ...prev[app.status], items: [app, ...prev[app.status].items] },
-    }))
-  }
+  useWebSocket(handleWsMessage, fetchAllColumns)
+
+  const handleCreated = useCallback((app) => {
+    setColumns((prev) => {
+      const col = prev[app.status]
+      if (!col) return prev
+      if (col.items.some((a) => a.id === app.id)) return prev
+      return {
+        ...prev,
+        [app.status]: { ...col, items: [app, ...col.items] },
+      }
+    })
+  }, [])
 
   const handleDragStart = (event) => {
     const applicationId = event.active.data.current?.applicationId

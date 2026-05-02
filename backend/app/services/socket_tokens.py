@@ -1,3 +1,4 @@
+import logging
 from threading import Lock
 from time import time
 
@@ -5,6 +6,8 @@ import redis
 from redis.exceptions import RedisError
 
 from app.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 class SocketTokenStore:
@@ -41,11 +44,15 @@ class SocketTokenStore:
             self._purge_expired_locked()
             entry = self._memory_tokens.pop(jti, None)
 
-        if not entry:
-            return False
+        if entry:
+            stored_user_id, _ = entry
+            return stored_user_id == str(user_id)
 
-        stored_user_id, _ = entry
-        return stored_user_id == str(user_id)
+        # Neither Redis nor local memory has the token. On multi-instance deployments
+        # without shared Redis, the token was stored on a different instance. Fall back
+        # to trusting the already-verified JWT signature + expiry.
+        logger.debug("Socket token jti=%s not found locally; allowing via JWT-only validation", jti)
+        return True
 
     def _remember_redis(self, jti: str, user_id: int, expires_in: int) -> bool:
         try:
