@@ -18,6 +18,7 @@ class WebSocketManager {
   connect() {
     if (this.disposed || this.connecting) return
     if (this.isConnected()) return
+    if (this.ws && this.ws.readyState === WebSocket.CONNECTING) return
 
     this.connecting = true
 
