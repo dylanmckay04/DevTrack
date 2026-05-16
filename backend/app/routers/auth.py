@@ -6,16 +6,20 @@ from sqlalchemy.orm import Session
 import httpx
 from app.config import settings
 from app.core.dependencies import get_db, get_current_user
-from app.core.security import hash_password, verify_password, create_access_token, create_socket_token, SOCKET_TOKEN_EXPIRE_SECONDS
 from app.core.limiter import limiter
 from app.models.user import User
-from app.schemas.user import UserCreate, UserOut, Token, SocketToken
+from app.schemas.user import UserCreate, UserOut, Token, SocketToken, VerificationMessage, ResendVerificationRequest
 from app.services.socket_tokens import socket_token_store
+from app.core.security import (
+    hash_password, verify_password, create_access_token,
+    create_socket_token, SOCKET_TOKEN_EXPIRE_SECONDS,
+    create_verification_token, decode_verification_token
+)
 
 router = APIRouter()
 
 
-@router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
+@router.post("/register", response_model=VerificationMessage, status_code=status.HTTP_201_CREATED)
 @limiter.limit("5/minute")
 def register(request: Request, user_in: UserCreate, db: Session = Depends(get_db)):
     if db.query(User).filter(User.email == user_in.email).first():
@@ -24,18 +28,55 @@ def register(request: Request, user_in: UserCreate, db: Session = Depends(get_db
     db.add(user)
     db.commit()
     db.refresh(user)
-    return user
+    
+    token = create_verification_token(user.id)
+    user.verification_token = token
+    db.commit()
+
+    from app.tasks.email_verification import send_verification_email
+    send_verification_email.delay(user.id, user.email, token)
+
+    return {"message": "Registration successful. Please check your email to verify your account."}
 
 
 @router.post("/login", response_model=Token)
 @limiter.limit("10/minute")
 def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == form_data.username).first()
-    if not user or not verify_password(form_data.password, user.hashed_password):
+    if not user or not user.hashed_password or not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid credentials")
+    if not user.is_verified:
+        raise HTTPException(status_code=403, detail="Email not verified. Please check youur inbox.")
     token = create_access_token({"sub": str(user.id)})
     return {"access_token": token, "token_type": "bearer"}
 
+
+@router.get("/verify")
+def verify_email(token: str, db: Session = Depends(get_db)):
+    user_id = decode_verification_token(token)
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if user.is_verified:
+        return RedirectResponse(f"{settings.FRONTEND_URL}/login?verified=already")
+    user.is_verified = True
+    user.verification_token = None
+    db.commit()
+    return RedirectResponse(f"{settings.FRONTEND_URL}/login?verified=true")
+
+
+@router.post("/resend-verification", status_code=status.HTTP_200_OK)
+@limiter.limit("3/minute")
+def resend_verification(request: Request, user_in: ResendVerificationRequest, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == user_in.email).first()
+    if not user or user.is_verified or not user.hashed_password:
+        return {"message": "If your email is registered and unverified, you will receive a new verification email shortly."}
+    token = create_verification_token(user.id)
+    user.verification_token = token
+    db.commit()
+    from app.tasks.email_verification import send_verification_email
+    send_verification_email.delay(user.id, user.email, token)
+    return {"message": "If your email is registered and unverified, you will receive a new verification email shortly."}
 
 @router.get("/me", response_model=UserOut)
 def get_me(current_user: User = Depends(get_current_user)):

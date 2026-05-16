@@ -7,6 +7,8 @@ from app.config import settings
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 hours
 SOCKET_TOKEN_EXPIRE_SECONDS = 60
+VERIFICATION_TOKEN_EXPIRE_HOURS = 24
+VERIFICATION_TOKEN_TYPE = "verification"
 
 pwd_context = CryptContext(schemes=["bcrypt_sha256"], deprecated="auto")
 
@@ -63,3 +65,27 @@ def decode_access_token(token: str) -> dict:
 
 def decode_socket_token(token: str) -> dict:
     return _decode_token(token, "socket")
+
+
+def create_verification_token(token: str) -> int:
+    """Returns user_id or raises HTTPException 400."""
+    from fastapi import HTTPException
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[ALGORITHM])
+        if payload.get("token_type") != VERIFICATION_TOKEN_TYPE:
+            raise HTTPException(status_code=400, detail="Invalid verification token")
+        return int(payload["sub"])
+    except JWTError:
+        raise HTTPException(status_code=400, detail="Invalid or expired verification token")
+
+
+def decode_verification_token(token: str) -> int:
+    """Returns user_id or raises HTTPException 400."""
+    from fastapi import HTTPException
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[ALGORITHM])
+        if payload.get("token_type") != VERIFICATION_TOKEN_TYPE:
+            raise HTTPException(status_code=400, detail="Invalid verification token")
+        return int(payload["sub"])
+    except JWTError:
+        raise HTTPException(status_code=400, detail="Invalid or expired verification token")
