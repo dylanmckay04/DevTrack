@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime
+from sqlalchemy import Column, Integer, String, DateTime, Boolean
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database import Base
@@ -12,6 +12,8 @@ class User(Base):
     hashed_password = Column(String, nullable=True)
     github_id = Column(String, unique=True, nullable=True, index=True)
     google_id = Column(String, unique=True, nullable=True, index=True)
+    is_verified = Column(Boolean, nullable=False, default=False)
+    verification_token = Column(String, unique=True, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     applications = relationship("Application", back_populates="owner", cascade="all, delete")
