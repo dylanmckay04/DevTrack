@@ -1,4 +1,5 @@
 import asyncio
+import inspect
 import json
 import logging
 from typing import Any, Callable, Awaitable
@@ -120,7 +121,12 @@ class RedisPubSub:
         while True:
             try:
                 while True:
-                    message = await loop.run_in_executor(None, self._pubsub.get_message, True, 1.0)
+                    # Support both sync and async PubSub.get_message implementations.
+                    get_message = self._pubsub.get_message
+                    if inspect.iscoroutinefunction(get_message):
+                        message = await get_message(True, 1.0)
+                    else:
+                        message = await loop.run_in_executor(None, get_message, True, 1.0)
 
                     if message and message.get("type") == "message":
                         channel = message.get("channel")
