@@ -66,9 +66,8 @@ class SocketTokenStore:
         """Remove token after disconnect - doesn't fail if missing"""
         if not jti:
             return
-        
         try:
-            await self._redis_client.delete(self._key(jti))
+            await asyncio.to_thread(self._redis_client.delete, self._key(jti))
         except (AttributeError, RedisError):
             pass
         
@@ -77,20 +76,25 @@ class SocketTokenStore:
 
     async def _remember_redis(self, jti: str, user_id: int, expires_in: int) -> bool:
         try:
-            return bool(
-                await self._redis_client.set(
-                    self._key(jti),
-                    str(user_id),
-                    ex=expires_in,
-                    nx=True,
-                )
+            result = await asyncio.to_thread(
+                self._redis_client.set,
+                self._key(jti),
+                str(user_id),
+                ex=expires_in,
+                nx=True,
             )
+            return bool(result)
         except (AttributeError, RedisError):
             return False
 
     async def _consume_redis(self, jti: str, user_id: int) -> bool | None:
         try:
-            stored_user_id = await self._redis_client.getdel(self._key(jti))
+            # redis-py v6 (sync) doesn't provide async methods; run in thread.
+            if hasattr(self._redis_client, "getdel"):
+                stored_user_id = await asyncio.to_thread(self._redis_client.getdel, self._key(jti))
+            else:
+                stored_user_id = await asyncio.to_thread(self._redis_client.get, self._key(jti))
+                await asyncio.to_thread(self._redis_client.delete, self._key(jti))
         except (AttributeError, RedisError):
             return None
 
@@ -111,7 +115,10 @@ class SocketTokenStore:
 
     async def close(self) -> None:
         if self._redis_client:
-            await self._redis_client.aclose()
+            try:
+                await asyncio.to_thread(self._redis_client.close)
+            except Exception:
+                pass
             self._redis_client = None
 
 
