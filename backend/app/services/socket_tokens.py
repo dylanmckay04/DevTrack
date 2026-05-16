@@ -1,9 +1,8 @@
-import logging
 import asyncio
-from threading import Lock
-from time import time
+import logging
+import time
 
-import redis
+import redis.asyncio as redis
 from redis.exceptions import RedisError
 
 from app.config import settings
@@ -67,17 +66,16 @@ class SocketTokenStore:
         if not jti:
             return
         try:
-            await asyncio.to_thread(self._redis_client.delete, self._key(jti))
+            await self._redis_client.delete(self._key(jti))
         except (AttributeError, RedisError):
             pass
-        
+
         async with self._memory_lock:
             self._memory_tokens.pop(jti, None)
 
     async def _remember_redis(self, jti: str, user_id: int, expires_in: int) -> bool:
         try:
-            result = await asyncio.to_thread(
-                self._redis_client.set,
+            result = await self._redis_client.set(
                 self._key(jti),
                 str(user_id),
                 ex=expires_in,
@@ -89,12 +87,11 @@ class SocketTokenStore:
 
     async def _consume_redis(self, jti: str, user_id: int) -> bool | None:
         try:
-            # redis-py v6 (sync) doesn't provide async methods; run in thread.
             if hasattr(self._redis_client, "getdel"):
-                stored_user_id = await asyncio.to_thread(self._redis_client.getdel, self._key(jti))
+                stored_user_id = await self._redis_client.getdel(self._key(jti))
             else:
-                stored_user_id = await asyncio.to_thread(self._redis_client.get, self._key(jti))
-                await asyncio.to_thread(self._redis_client.delete, self._key(jti))
+                stored_user_id = await self._redis_client.get(self._key(jti))
+                await self._redis_client.delete(self._key(jti))
         except (AttributeError, RedisError):
             return None
 

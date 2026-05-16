@@ -17,7 +17,6 @@ ChannelHandler = Callable[[str, dict[str, Any]], Awaitable[None]]
 class RedisPubSub:
     def __init__(self):
         self._redis_client: redis.Redis | None = None
-        self._pubsub_client: redis.Redis | None = None
         self._pubsub: redis.client.PubSub | None = None
         self._subscriber_task: asyncio.Task | None = None
         self._handlers: dict[str, ChannelHandler] = {}
@@ -32,15 +31,10 @@ class RedisPubSub:
                     socket_connect_timeout=2,
                     socket_timeout=2,
                 )
-                self._pubsub_client = redis.from_url(
-                    settings.CELERY_BROKER_URL,
-                    decode_responses=True,
-                )
-                logger.info("Redis clients created for pub/sub: %s", settings.CELERY_BROKER_URL)
+                logger.info("Redis client created for pub/sub: %s", settings.CELERY_BROKER_URL)
             except (RedisError, AttributeError) as e:
                 logger.error("Failed to create Redis client for pub/sub: %s", e)
                 self._redis_client = None
-                self._pubsub_client = None
         else:
             logger.warning("CELERY_BROKER_URL not set, Redis pub/sub disabled")
 
@@ -75,7 +69,7 @@ class RedisPubSub:
             return False
 
     async def subscribe(self, channel: str, handler: ChannelHandler) -> bool:
-        if not self._pubsub_client:
+        if not self._redis_client:
             return False
 
         self._handlers[channel] = handler
@@ -85,7 +79,7 @@ class RedisPubSub:
 
         try:
             if self._pubsub is None:
-                self._pubsub = self._pubsub_client.pubsub(ignore_subscribe_messages=True)
+                self._pubsub = self._redis_client.pubsub(ignore_subscribe_messages=True)
 
             await self._pubsub.subscribe(channel)
             self._subscribed_channels.add(channel)
@@ -175,13 +169,6 @@ class RedisPubSub:
             except RedisError as e:
                 logger.warning("Error closing Redis client: %s", e)
             self._redis_client = None
-
-        if self._pubsub_client:
-            try:
-                await self._pubsub_client.aclose()
-            except RedisError as e:
-                logger.warning("Error closing pub/sub client: %s", e)
-            self._pubsub_client = None
 
         self._subscribed_channels.clear()
         self._handlers.clear()
