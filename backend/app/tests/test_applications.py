@@ -1,4 +1,5 @@
 from fastapi.testclient import TestClient
+from app.models.user import User
 
 
 def test_create_application(auth_client):
@@ -33,17 +34,20 @@ def test_update_status(auth_client):
     assert response.status_code == 200
     assert response.json()["status"] == "interviewing"
 
-def test_cannot_access_other_users_application(auth_client, client):
+def test_cannot_access_other_users_application(auth_client, client, db):
     create = auth_client.post("/applications", json={
         "company": "Test Inc.",
         "role": "Backend Engineer"
     })
     app_id = create.json()["id"]
-    
+
     client.post("/auth/register", json={
         "email": "test2@example.com",
         "password": "testPass123"
     })
+    user2 = db.query(User).filter(User.email == "test2@example.com").first()
+    user2.is_verified = True
+    db.commit()
     login = client.post("/auth/login", data={
         "username": "test2@example.com",
         "password": "testPass123"
@@ -115,7 +119,7 @@ def test_update_status_broadcasts_websocket_event(auth_client):
     assert message["application"]["status"] == "offer"
 
 
-def test_websocket_events_are_isolated_by_user(auth_client):
+def test_websocket_events_are_isolated_by_user(auth_client, db):
     socket_token_user1 = auth_client.post("/auth/socket-token").json()["socket_token"]
 
     with TestClient(auth_client.app) as second_client:
@@ -123,6 +127,9 @@ def test_websocket_events_are_isolated_by_user(auth_client):
             "email": "isolation@example.com",
             "password": "testPass123",
         })
+        isolation_user = db.query(User).filter(User.email == "isolation@example.com").first()
+        isolation_user.is_verified = True
+        db.commit()
         second_login = second_client.post("/auth/login", data={
             "username": "isolation@example.com",
             "password": "testPass123",

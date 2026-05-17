@@ -72,7 +72,7 @@ def get_document_preview(
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
 
-    ext = os.path.splitext(doc.r2_key)[1].lower()
+    ext = os.path.splitext(doc.filename)[1].lower()
     content_type = CONTENT_TYPE_MAP.get(ext, "application/octet-stream")
     url = get_presigned_url(doc.r2_key)
     return {"url": url, "content_type": content_type}

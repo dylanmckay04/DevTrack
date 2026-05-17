@@ -54,8 +54,8 @@ def test_login_unverified_user_returns_403(client):
         "email": "dylan@example.com",
         "password": "strongPass123"
     })
-    response = client.post("/auth/register", json={
-        "email": "dylan@example.com",
+    response = client.post("/auth/login", data={
+        "username": "dylan@example.com",
         "password": "strongPass123"
     })
     assert response.status_code == 403
@@ -70,7 +70,7 @@ def test_login_verified_user_succeeds(client, db):
     user.is_verified = True
     db.commit()
 
-    response = client.post("/auth/login", json={
+    response = client.post("/auth/login", data={
         "username": "dylan@example.com",
         "password": "strongPass123"
     })
@@ -196,8 +196,14 @@ def test_socket_token_is_single_use(auth_client):
 
 
 def test_socket_token_single_use_when_redis_unavailable(auth_client, monkeypatch):
-    monkeypatch.setattr(socket_token_store, "_remember_redis", lambda jti, user_id, expires_in: False)
-    monkeypatch.setattr(socket_token_store, "_consume_redis", lambda jti, user_id: None)
+    async def fake_remember_redis(jti, user_id, expires_in):
+        return False
+
+    async def fake_consume_redis(jti, user_id):
+        return None
+
+    monkeypatch.setattr(socket_token_store, "_remember_redis", fake_remember_redis)
+    monkeypatch.setattr(socket_token_store, "_consume_redis", fake_consume_redis)
 
     socket_token = auth_client.post("/auth/socket-token").json()["socket_token"]
 

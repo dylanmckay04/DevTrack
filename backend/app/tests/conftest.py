@@ -1,7 +1,14 @@
 import os
 
 os.environ["TESTING"] = "1"
-_TEST_DB_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5433/devtrack_test")
+# Disable Celery and Redis for tests to avoid connection errors
+os.environ.pop("CELERY_BROKER_URL", None)
+os.environ.pop("CELERY_RESULT_BACKEND", None)
+os.environ["CELERY_BROKER_URL"] = ""
+os.environ["CELERY_RESULT_BACKEND"] = ""
+
+# Set test database URL - use localhost since tests run outside Docker
+_TEST_DB_URL = "postgresql://postgres:postgres@localhost:5433/devtrack_test"
 os.environ["DATABASE_URL"] = _TEST_DB_URL
 
 import pytest
@@ -12,7 +19,11 @@ from sqlalchemy.orm import sessionmaker
 from app.main import app
 from app.database import Base
 from app.core.dependencies import get_db
+from app.config import settings
 from app.models.user import User
+
+# Verify that test database URL is being used
+assert settings.DATABASE_URL == _TEST_DB_URL, f"Database URL mismatch: expected {_TEST_DB_URL}, got {settings.DATABASE_URL}"
 
 engine = create_engine(_TEST_DB_URL)
 TestingSessionLocal = sessionmaker(bind=engine)
@@ -62,6 +73,6 @@ def auth_client(client, db):
     token = response.json()["access_token"]
     client.token = token
     client.headers.update({"Authorization": f"Bearer {token}"})
-    client.user = types.SimpleNamespace(id=register_response.json()["id"])
+    client.user = types.SimpleNamespace(id=user.id)  # Get ID from database query
     return client
 

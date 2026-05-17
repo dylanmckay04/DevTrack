@@ -1,7 +1,8 @@
+import hashlib
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
+import bcrypt
 from jose import jwt, JWTError
-from passlib.context import CryptContext
 from app.config import settings
 
 ALGORITHM = "HS256"
@@ -10,15 +11,18 @@ SOCKET_TOKEN_EXPIRE_SECONDS = 60
 VERIFICATION_TOKEN_EXPIRE_HOURS = 24
 VERIFICATION_TOKEN_TYPE = "verification"
 
-pwd_context = CryptContext(schemes=["bcrypt_sha256"], deprecated="auto")
+
+def _prehash(password: str) -> bytes:
+    # SHA-256 prehash removes bcrypt's 72-byte input limit
+    return hashlib.sha256(password.encode()).digest()
 
 
 def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
+    return bcrypt.hashpw(_prehash(password), bcrypt.gensalt()).decode()
 
 
 def verify_password(plain: str, hashed: str) -> bool:
-    return pwd_context.verify(plain, hashed)
+    return bcrypt.checkpw(_prehash(plain), hashed.encode())
 
 
 def _create_signed_token(data: dict, expires_delta: timedelta, token_type: str) -> str:
@@ -67,16 +71,13 @@ def decode_socket_token(token: str) -> dict:
     return _decode_token(token, "socket")
 
 
-def create_verification_token(token: str) -> int:
-    """Returns user_id or raises HTTPException 400."""
-    from fastapi import HTTPException
-    try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[ALGORITHM])
-        if payload.get("token_type") != VERIFICATION_TOKEN_TYPE:
-            raise HTTPException(status_code=400, detail="Invalid verification token")
-        return int(payload["sub"])
-    except JWTError:
-        raise HTTPException(status_code=400, detail="Invalid or expired verification token")
+def create_verification_token(user_id: int) -> str:
+    """Creates a verification token for a user_id."""
+    return _create_signed_token(
+        {"sub": str(user_id)},
+        timedelta(hours=VERIFICATION_TOKEN_EXPIRE_HOURS),
+        VERIFICATION_TOKEN_TYPE,
+    )
 
 
 def decode_verification_token(token: str) -> int:

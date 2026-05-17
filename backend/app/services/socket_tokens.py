@@ -48,18 +48,13 @@ class SocketTokenStore:
 
         async with self._memory_lock:
             self._purge_expired_locked()
-            import time
-            entry = self._memory_tokens.get(jti)
+            entry = self._memory_tokens.pop(jti, None)
 
-        if entry:
+        if entry is not None:
             stored_user_id, _ = entry
             return stored_user_id == str(user_id)
 
-        # Neither Redis nor local memory has the token. On multi-instance deployments
-        # without shared Redis, the token was stored on a different instance. Fall back
-        # to trusting the already-verified JWT signature + expiry.
-        logger.debug("Socket token jti=%s not found locally; allowing via JWT-only validation", jti)
-        return True
+        return False
 
     async def remove(self, jti: str) -> None:
         """Remove token after disconnect - doesn't fail if missing"""

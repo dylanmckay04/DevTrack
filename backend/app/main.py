@@ -13,6 +13,7 @@ from app.database import engine
 from app.routers import auth, applications, documents, reminders, websocket
 from app.services.board_events import manager
 from app.services.socket_tokens import socket_token_store
+from app.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -39,8 +40,25 @@ def wait_for_db(retries=10, delay=3):
             time.sleep(delay)
     raise Exception("Could not connect to database after multiple retries")
 
+def check_redis_health():
+    """Check Redis connectivity and log status. Non-blocking - doesn't fail startup."""
+    try:
+        import redis
+        if settings.CELERY_BROKER_URL:
+            try:
+                r = redis.from_url(settings.CELERY_BROKER_URL, socket_connect_timeout=2, socket_timeout=2, decode_responses=True)
+                r.ping()
+                logger.info("Redis is healthy: %s", settings.CELERY_BROKER_URL)
+            except Exception as e:
+                logger.warning("Redis unavailable (%s). WebSocket and Celery features may be degraded: %s", settings.CELERY_BROKER_URL, e)
+        else:
+            logger.info("Redis/Celery not configured. Using fallback modes.")
+    except Exception as e:
+        logger.warning("Could not check Redis health: %s", e)
+
 if not os.getenv("TESTING"):
         wait_for_db()
+        check_redis_health()
 
 app = FastAPI(title="DevTrack", lifespan=lifespan)
 app.state.limiter = limiter
