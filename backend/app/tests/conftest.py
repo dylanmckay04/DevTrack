@@ -5,12 +5,14 @@ _TEST_DB_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localho
 os.environ["DATABASE_URL"] = _TEST_DB_URL
 
 import pytest
+import types
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from app.main import app
 from app.database import Base
 from app.core.dependencies import get_db
+from app.models.user import User
 
 engine = create_engine(_TEST_DB_URL)
 TestingSessionLocal = sessionmaker(bind=engine)
@@ -41,11 +43,18 @@ def client(db):
     app.dependency_overrides.clear()
     
 @pytest.fixture
-def auth_client(client):
+def auth_client(client, db):
     register_response = client.post("/auth/register", json={
         "email": "test@example.com",
         "password": "testPass123"
     })
+
+    # Bypass email verification for testing
+    user = db.query(User).filter(User.email == "test@example.com").first()
+    user.is_verified = True
+    user.verification_token = None
+    db.commit()
+
     response = client.post("/auth/login", data={
         "username": "test@example.com",
         "password": "testPass123"
@@ -53,7 +62,6 @@ def auth_client(client):
     token = response.json()["access_token"]
     client.token = token
     client.headers.update({"Authorization": f"Bearer {token}"})
-    import types
     client.user = types.SimpleNamespace(id=register_response.json()["id"])
     return client
 

@@ -1,29 +1,76 @@
 import pytest
 from starlette.websockets import WebSocketDisconnect
+from app.models.user import User
+from app.core.security import create_verification_token
 from app.services.socket_tokens import socket_token_store
 
+
+# ── Health ────────────────────────────────────────────────────────────────────
 
 def test_health_check(client):
     response = client.get("/health")
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
 
-def test_register(client):
+
+# ── Registration ──────────────────────────────────────────────────────────────
+
+def test_register_returns_verification_message(client):
     response = client.post("/auth/register", json={
         "email": "dylan@example.com",
         "password": "strongPass123"
     })
     assert response.status_code == 201
     data = response.json()
-    assert data["email"] == "dylan@example.com"
-    assert "password" not in data
+    assert "message" in data
+    assert "verify" in data["message"].lower()
 
-def test_login(client):
+def test_register_duplicate_email(client):
     client.post("/auth/register", json={
         "email": "dylan@example.com",
         "password": "strongPass123"
     })
-    response = client.post("/auth/login", data={
+    response = client.post("/auth/register", json={
+        "email": "dylan@example.com",
+        "password": "strongPass123"
+    })
+    assert response.status_code == 400
+
+def test_register_creates_unverified_user(client, db):
+    client.post("/auth/register", json={
+        "email": "unverified@example.com",
+        "password": "strongPass123"
+    })
+    user = db.query(User).filter(User.email == "unverified@example.com").first()
+    assert user is not None
+    assert user.is_verified is False
+    assert user.verification_token is not None
+
+
+# ── Login ──────────────────────────────────────────────────────────────
+
+def test_login_unverified_user_returns_403(client):
+    client.post("/auth/register", json={
+        "email": "dylan@example.com",
+        "password": "strongPass123"
+    })
+    response = client.post("/auth/register", json={
+        "email": "dylan@example.com",
+        "password": "strongPass123"
+    })
+    assert response.status_code == 403
+    assert "verified" in response.json()["detail"].lower()
+
+def test_login_verified_user_succeeds(client, db):
+    client.post("/auth/register", json={
+        "email": "dylan@example.com",
+        "password": "strongPass123"
+    })
+    user = db.query(User).filter(User.email == "dylan@example.com").first()
+    user.is_verified = True
+    db.commit()
+
+    response = client.post("/auth/login", json={
         "username": "dylan@example.com",
         "password": "strongPass123"
     })
@@ -41,9 +88,90 @@ def test_login_wrong_password(client):
     })
     assert response.status_code == 401
 
+
+# ── Email verification ──────────────────────────────────────────────────────────────
+
+def test_verify_email_success(client, db):
+    client.post("/auth/register", json={
+        "email": "dylan@example.com",
+        "password": "strongPass123"
+    })
+    user = db.query(User).filter(User.email == "dylan@example.com").first()
+    token = user.verification_token
+
+    response = client.get(f"/auth/verify?token={token}", follow_redirects=False)
+    assert response.status_code in (302, 307)
+    assert "verified=true" in response.headers["location"]
+
+    db.refresh(user)
+    assert user.is_verified is True
+    assert user.verification_token is None
+
+def test_verify_email_invalid_token(client):
+    response = client.get("/auth/verify?token=totallyinvalidtoken", follow_redirects=False)
+    assert response.status_code == 400
+
+def test_verify_email_already_verified(client, db):
+    client.post("/auth/register", json={
+        "email": "dylan@example.com",
+        "password": "strongPass123"
+    })
+    user = db.query(User).filter(User.email == "dylan@example.com").first()
+    token = user.verification_token
+    user.is_verified = True
+    db.commit()
+
+    response = client.get(f"/auth/verify?token={token}", follow_redirects=False)
+    assert response.status_code in (302, 307)
+    assert "verified=already" in response.headers["location"]
+
+
+# ── Resend verification ──────────────────────────────────────────────────────────────
+
+def test_resend_verification_success(client):
+    client.post("/auth/register", json={
+        "email": "dylan@example.com",
+        "password": "strongPass123"
+    })
+    response = client.post("/auth/resend-verification", json={
+        "email": "dylan@example.com"
+    })
+    assert response.status_code == 200
+    assert "message" in response.json()
+
+def test_resend_verification_nonexistent_email_returns_200(client):
+    client.post("/auth/register", json={
+        "email": "ghost@example.com",
+        "password": "ghostPass123"
+    })
+    response = client.post("/auth/resend-verification", json={
+        "email": "ghost@example.com"
+    })
+    assert response.status_code == 200
+
+def test_resend_verification_already_verified_returns_200(client, db):
+    client.post("/auth/register", json={
+        "email": "dylan@example.com",
+        "password": "strongPass123"
+    })
+    user = db.query(User).filter(User.email == "dylan@example.com").first()
+    user.is_verified = True
+    db.commit()
+
+    response = client.post("/auth/resend-verification", json={
+        "email": "dylan@example.com"
+    })
+    assert response.status_code == 200
+
+
+# ── Protected routes ──────────────────────────────────────────────────────────────
+
 def test_protected_route_without_token(client):
     response = client.get("/auth/me")
     assert response.status_code == 401
+
+
+# ── Socket tokens ──────────────────────────────────────────────────────────────
 
 def test_get_socket_token(auth_client):
     response = auth_client.post("/auth/socket-token")
