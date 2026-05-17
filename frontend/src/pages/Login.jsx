@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { login as loginApi, getMe } from '../services/api'
 import { useAuth } from '../hooks/useAuth'
 
@@ -10,6 +10,9 @@ export default function Login() {
   const [loading, setLoading] = useState(false)
   const { login } = useAuth()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const justRegistered = searchParams.get('registered') === 'true'
+  const justVerified = searchParams.get('verified') === 'true'
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -36,6 +39,12 @@ export default function Login() {
           <span style={styles.logo}>~/devtrack</span>
           <p style={styles.sub}>sign in to your account</p>
         </div>
+        {justRegistered && (
+          <p style={styles.success}>$ check your email to verify your account</p>
+        )}
+        {justVerified && (
+          <p style={styles.success}>$ email verified - you can now log in</p>
+        )}
         <form onSubmit={handleSubmit} style={styles.form}>
           <div style={styles.field}>
             <label style={styles.label}>email</label>
@@ -106,6 +115,7 @@ const styles = {
   form: { display: 'flex', flexDirection: 'column', gap: '16px' },
   field: { display: 'flex', flexDirection: 'column', gap: '6px' },
   label: { color: 'var(--text-secondary)', fontSize: '11px' },
+  success: { color: 'var(--accent)', fontSize: '11px' },
   error: { color: 'var(--red)', fontSize: '11px' },
   divider: { textAlign: 'center', color: 'var(--text-muted)', fontSize: '11px', margin: '16px 0 0' },
   githubBtn: {

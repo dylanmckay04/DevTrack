@@ -17,12 +17,7 @@ export default function Register() {
     setLoading(true)
     try {
       await registerApi({ email, password })
-      const res = await loginApi(email, password)
-      const token = res.data.access_token
-      localStorage.setItem("token", token)
-      const me = await getMe()
-      login(res.data.access_token, me.data)
-      navigate('/')
+      navigate('/login?registered=true')
     } catch (err) {
       setError(err.response?.data?.detail || 'registration failed')
     } finally {
