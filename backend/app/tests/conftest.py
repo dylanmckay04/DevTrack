@@ -7,8 +7,7 @@ os.environ.pop("CELERY_RESULT_BACKEND", None)
 os.environ["CELERY_BROKER_URL"] = ""
 os.environ["CELERY_RESULT_BACKEND"] = ""
 
-# Set test database URL - use localhost since tests run outside Docker
-_TEST_DB_URL = "postgresql://postgres:postgres@localhost:5433/devtrack_test"
+_TEST_DB_URL = os.environ.get("DATABASE_URL", "postgresql://postgres:postgres@localhost:5433/devtrack_test")
 os.environ["DATABASE_URL"] = _TEST_DB_URL
 
 import pytest
