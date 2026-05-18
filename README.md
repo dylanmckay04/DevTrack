@@ -12,7 +12,7 @@ This project is the centerpiece of my portfolio and reflects how I approach soft
 - Full-stack ownership across React, FastAPI, PostgreSQL, Redis, and cloud storage
 - Realtime architecture with server-authoritative events and user-scoped WebSocket delivery
 - Security-focused implementation: rate limiting, upload validation, single-use socket tokens with replay protection
-- Testing discipline with integration tests for authentication, authorization, CRUD, upload validation, and realtime edge cases
+- Full-stack testing discipline: backend integration tests covering auth, CRUD, upload validation, and realtime edge cases; frontend unit and component tests covering pages, components, hooks, and API interceptors
 - CI pipeline with GitHub Actions running the full suite against real PostgreSQL and Redis service containers
 - Flexible authentication: email/password and OAuth 2.0 (GitHub, Google) with automatic account linking
 - Practical product design for a real user workflow rather than isolated feature demos
@@ -83,6 +83,12 @@ This project is the centerpiece of my portfolio and reflects how I approach soft
 - Axios — HTTP client with auth interceptors
 - Vite — build tool and dev server
 
+### Frontend Testing
+
+- Vitest — test runner with jsdom environment
+- React Testing Library + user-event — component and interaction testing
+- MSW (Mock Service Worker) v2 — API mocking at the network level
+
 ### Backend Libraries
 
 - SQLAlchemy ORM + Alembic migrations
@@ -101,13 +107,16 @@ This project is the centerpiece of my portfolio and reflects how I approach soft
 - Celery — distributed task queue for scheduled email reminders
 - User-scoped, server-originated WebSocket board events
 - Pytest suite covering auth, CRUD, upload validation, and WebSocket security/replay hardening
+- Vitest + React Testing Library + MSW frontend suite covering pages, components, hooks, context, and API interceptors
 - GitHub Actions CI (PostgreSQL 16 + Redis 7 service containers)
 
 ## Testing
 
-The backend includes a pytest suite for authentication, authorization, application CRUD, and realtime/security behavior. Tests run against a dedicated PostgreSQL test database and use FastAPI TestClient with dependency overrides to isolate from production data.
+The project has a full-stack test suite covering both the backend API and the frontend React application.
 
-### Test Coverage
+### Backend Coverage
+
+The pytest suite tests authentication, authorization, application CRUD, and realtime/security behavior. Tests run against a dedicated PostgreSQL test database and use FastAPI TestClient with dependency overrides to isolate from production data.
 
 - User registration and JWT authentication flow
 - Protected route enforcement without a valid token
@@ -118,15 +127,37 @@ The backend includes a pytest suite for authentication, authorization, applicati
 - Single-use short-lived socket token replay protection
 - Redis-unavailable fallback behavior for socket token replay checks
 
-Test strategy: focus on integration behavior at API and websocket boundaries where regressions are most likely to impact real users.
+### Frontend Coverage
+
+112 tests written with Vitest, React Testing Library, and MSW. API calls are intercepted at the network level (no manual mocking of fetch/axios), so tests exercise real component logic against realistic server responses.
+
+- **Pages**: Board (drag-and-drop, WebSocket events, pagination, optimistic updates), ApplicationDetail (status changes, editing, documents, reminders), Login, Register, Analytics, GitHubCallback, GoogleCallback
+- **Components**: Navbar, ApplicationModal, ApplicationCard, KanbanColumn, ReminderModal
+- **Context**: AuthProvider (token persistence, login/logout, ProtectedRoute)
+- **Hook**: useWebSocket (singleton lifecycle, reconnect, message dispatch, module isolation)
+- **Service**: api.js Axios interceptors (auth header injection, 401 token removal)
+
+Test strategy: integration behavior at component and API boundaries. MSW handlers return realistic data so tests cover the full render-fetch-display cycle without relying on implementation details.
 
 ### Running Tests
 
-1. Ensure a PostgreSQL database named devtrack_test exists locally.
-2. From the backend directory, run:
+**Backend** — ensure a PostgreSQL database named `devtrack_test` exists locally, then from the `backend` directory:
 
 ```bash
 pytest -v
+```
+
+**Frontend** — from the `frontend` directory:
+
+```bash
+# Run once
+npm run test:run
+
+# Watch mode during development
+npm test
+
+# Coverage report
+npm run coverage
 ```
 
 ## Technical Decisions
@@ -303,6 +334,4 @@ Interactive documentation: https://devtrack-production-5644.up.railway.app/docs
 
 - Redis cluster support for high availability
 - Reminder editing after creation (currently reminders are immutable once scheduled)
-- Frontend test coverage (unit + integration tests for React components and hooks)
 - Bulk application import (e.g. from CSV)
-- Email verification for new email/password accounts
