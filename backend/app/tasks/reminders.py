@@ -1,14 +1,6 @@
-from celery import Celery
-from app.config import settings
+from app.celery_app import celery_app
 from app.database import SessionLocal
 from app.services.email import send_email
-
-if settings.CELERY_BROKER_URL and settings.CELERY_RESULT_BACKEND:
-    celery_app = Celery("devtrack", broker=settings.CELERY_BROKER_URL, backend=settings.CELERY_RESULT_BACKEND)
-else:
-    from unittest.mock import MagicMock
-    celery_app = MagicMock()
-    celery_app.task = lambda func: func
 
 @celery_app.task
 def send_reminder_email(reminder_id: int, user_email: str, message: str):
