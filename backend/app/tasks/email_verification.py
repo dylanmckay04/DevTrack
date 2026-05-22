@@ -6,7 +6,7 @@ from app.services.email import send_email
 @celery_app.task
 def send_verification_email(user_id: int, user_email: str, token: str):
     """Celery task to send a verification email to the user."""
-    verify_url = f"{settings.FRONTEND_URL}/auth/verify?token={token}"
+    verify_url = f"{settings.BACKEND_URL}/auth/verify?token={token}"
     send_email(
         to=user_email,
         subject="Verify Your DevTrack Account",

@@ -13,6 +13,7 @@ export default function Login() {
   const [searchParams] = useSearchParams()
   const justRegistered = searchParams.get('registered') === 'true'
   const justVerified = searchParams.get('verified') === 'true'
+  const alreadyVerified = searchParams.get('verified') === 'already'
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -44,6 +45,9 @@ export default function Login() {
         )}
         {justVerified && (
           <p style={styles.success}>$ email verified - you can now log in</p>
+        )}
+        {alreadyVerified && (
+          <p style={styles.success}>$ already verified - you can log in</p>
         )}
         <form onSubmit={handleSubmit} style={styles.form}>
           <div style={styles.field}>
